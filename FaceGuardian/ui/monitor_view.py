@@ -72,6 +72,7 @@ class MonitorView(QWidget):
         
         # Data Fields
         self.lbl_status = self.create_info_row(ip_layout, "STATUS", "SCANNING...", Theme.TEXT_SUB)
+        self.lbl_camera = self.create_info_row(ip_layout, "SOURCE", "CAM 0", Theme.PRIMARY)
         self.lbl_name = self.create_info_row(ip_layout, "IDENTITY", "---", Theme.TEXT_MAIN)
         self.lbl_conf = self.create_info_row(ip_layout, "CONFIDENCE", "0%", Theme.TEXT_MAIN)
         self.lbl_time = self.create_info_row(ip_layout, "LAST SEEN", "---", Theme.TEXT_SUB)
@@ -211,6 +212,10 @@ class MonitorView(QWidget):
         else:
             self.lbl_status.setText("UNAUTHORIZED")
             self.lbl_status.setStyleSheet(f"color: {Theme.DANGER}; font-size: 16px; font-weight: 800;")
+
+    @pyqtSlot(str)
+    def update_camera_info(self, name):
+        self.lbl_camera.setText(name.upper())
 
     def capture_intruder(self, frame, x, y, w, h):
         timestamp = time.strftime("%Y%m%d_%H%M%S")
