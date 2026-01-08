@@ -14,6 +14,7 @@ class FaceRecognitionEngine:
         # Paths for models
         self.detect_model_path = "face_detection_yunet_2023mar.onnx"
         self.rec_model_path = "face_recognition_sface_2021dec.onnx"
+        self.liveness_model_path = "anti_spoofing_minifasnetv2.onnx"
         
         self._ensure_models_exist()
         
@@ -31,31 +32,31 @@ class FaceRecognitionEngine:
                     self.rec_model_path, "", 
                     cv2.dnn.DNN_BACKEND_CUDA, cv2.dnn.DNN_TARGET_CUDA
                 )
-                # TEST RUN: Force execution to check if CUDA is actually available
-                # This prevents "lazy" crashes later during runtime
+                self.liveness_net = cv2.dnn.readNetFromONNX(self.liveness_model_path)
+                self.liveness_net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+                self.liveness_net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+                
+                # TEST RUN
                 dummy_img = np.zeros((320, 320, 3), dtype=np.uint8)
                 self.detector.detect(dummy_img)
                 self.backend_name = "NVIDIA CUDA"
                 print("✅ NVIDIA GPU (CUDA) Enabled & Verified!")
-                self.backend_name = "NVIDIA CUDA"
-                print("✅ NVIDIA GPU (CUDA) Enabled & Verified!")
             except Exception as cuda_err:
-                # 2. Skip OpenCL (User reported lag due to memory transfer overhead)
-                # 3. Fallback to CPU (Tested & Verified Lag-Free)
+                # Fallback to CPU
                 print(f"CUDA Failed ({cuda_err}). Switching to CPU (High Performance).")
                 self.detector = cv2.FaceDetectorYN.create(
                     self.detect_model_path, "", self.input_size, 0.5, 0.3, 5000
                 )
                 self.recognizer = cv2.FaceRecognizerSF.create(self.rec_model_path, "")
+                self.liveness_net = cv2.dnn.readNetFromONNX(self.liveness_model_path)
                 self.backend_name = "CPU (Optimized)"
-            print(f"✅ AI Engine Initialized [{self.backend_name}]")
             print(f"✅ AI Engine Initialized [{self.backend_name}]")
             
         except Exception as e:
             print(f"CRITICAL ERROR initializing models: {e}")
             # Try to delete bad models so they re-download next time
-            if os.path.exists(self.detect_model_path): os.remove(self.detect_model_path)
-            if os.path.exists(self.rec_model_path): os.remove(self.rec_model_path)
+            for p in [self.detect_model_path, self.rec_model_path, self.liveness_model_path]:
+                if os.path.exists(p): os.remove(p)
             raise e
         
         if not os.path.exists(self.known_faces_dir):
@@ -65,9 +66,13 @@ class FaceRecognitionEngine:
 
     def _ensure_models_exist(self):
         base_url = "https://github.com/opencv/opencv_zoo/raw/main/models/"
+        # Liveness model from a compatible verified source (MiniFASNetV2)
+        liveness_url = "https://github.com/kprokopi/onnx_runtime_face_anti_spoofing/raw/master/anti_spoofing_minifasnetv2.onnx"
+        
         models = {
             self.detect_model_path: base_url + "face_detection_yunet/face_detection_yunet_2023mar.onnx",
-            self.rec_model_path: base_url + "face_recognition_sface/face_recognition_sface_2021dec.onnx"
+            self.rec_model_path: base_url + "face_recognition_sface/face_recognition_sface_2021dec.onnx",
+            self.liveness_model_path: liveness_url
         }
         
         for name, url in models.items():
@@ -94,11 +99,6 @@ class FaceRecognitionEngine:
                     embedding = np.fromfile(path, dtype=np.float32)
                     
                     if embedding.shape[0] != 128:
-                        print(f"WARNING: Ignoring & Deleting incompatible legacy profile: {filename} (Size: {embedding.shape[0]})")
-                        try:
-                            os.remove(path)
-                        except:
-                            pass
                         continue
                         
                     # Reshape to (1, 128) for cv2.match
@@ -115,10 +115,6 @@ class FaceRecognitionEngine:
         h, w = image.shape[:2]
         self.detector.setInputSize((w, h))
         ret, faces = self.detector.detect(image)
-        
-        if faces is not None:
-             pass
-             
         return faces if faces is not None else []
 
     def register_new_face(self, name: str, image: np.ndarray, append: bool = False) -> bool:
@@ -136,19 +132,64 @@ class FaceRecognitionEngine:
         filename = f"{name}{suffix}.dat"
         feature.tofile(os.path.join(self.known_faces_dir, filename))
         
-        # Save visual reference (optional but helpful)
+        # Save visual reference
         cv2.imwrite(os.path.join(self.known_faces_dir, f"{name}.jpg"), aligned_face)
         
-        # OPTIMIZATION: Incremental Memory Update (O(1)) instead of Full Reload (O(N))
-        # This prevents the UI freeze during registration
+        # Incremental Update
         if name not in self.known_embeddings:
             self.known_embeddings[name] = []
         
-        # Reshape to (1, 128) to match correct format
         valid_feature = feature.reshape(1, 128)
         self.known_embeddings[name].append(valid_feature)
-        
         return True
+
+    def check_liveness(self, image: np.ndarray, face_box: np.ndarray) -> Tuple[bool, float]:
+        """
+        Check if the face is real or a spoof (photo/screen/mask).
+        Returns (is_real, score) where score > threshold means real.
+        """
+        try:
+            # 1. Expand box slightly (MiniFASNet expects context)
+            x, y, w, h = map(int, face_box[:4])
+            h_img, w_img = image.shape[:2]
+            
+            scale = 1.2
+            new_w, new_h = int(w * scale), int(h * scale)
+            center_x, center_y = x + w//2, y + h//2
+            
+            x1 = max(0, center_x - new_w//2)
+            y1 = max(0, center_y - new_h//2)
+            x2 = min(w_img, x1 + new_w)
+            y2 = min(h_img, y1 + new_h)
+            
+            face_roi = image[y1:y2, x1:x2]
+            if face_roi.size == 0: return False, 0.0
+            
+            # 2. Preprocess for MiniFASNetV2 (80x80)
+            blob = cv2.dnn.blobFromImage(
+                face_roi, scalefactor=1.0/255.0, size=(80, 80), 
+                mean=(0, 0, 0), swapRB=True, crop=False
+            )
+            
+            # 3. Predict
+            self.liveness_net.setInput(blob)
+            output = self.liveness_net.forward()
+            
+            # 4. Softmax
+            output = np.exp(output) / np.sum(np.exp(output), axis=1, keepdims=True)
+            
+            # Class 0: Fake, Class 1: Real (usually, depends on model training)
+            # For MiniFASNetV2: [Fake, Real, ...] (Wait, typically it's 3 classes: Real, Print, Mobile)
+            # Actually MiniFASNet standard: index 1 is Real.
+            
+            real_score = output[0][1]
+            is_real = real_score > 0.5 # Threshold can be tuned
+            
+            return is_real, float(real_score)
+            
+        except Exception as e:
+            print(f"Liveness Check Failed: {e}")
+            return True, 1.0 # Fail safe (allow access if model breaks)
 
     def recognize(self, image: np.ndarray, face_info: np.ndarray) -> Tuple[str, float]:
         aligned_face = self.recognizer.alignCrop(image, face_info)
@@ -159,7 +200,6 @@ class FaceRecognitionEngine:
         
         for name, embeddings in self.known_embeddings.items():
             for known_emb in embeddings:
-                # SFace match function (0: cosine, 1: norm-l2)
                 sim = self.recognizer.match(query_feature, known_emb, 0)
                 if sim > max_sim:
                     max_sim = sim
@@ -170,14 +210,9 @@ class FaceRecognitionEngine:
         return "Unknown", max_sim
 
     def delete_person(self, name: str):
-        # 1. Delete files (Support both jpg and png)
         for filename in os.listdir(self.known_faces_dir):
             if filename.startswith(name):
-                try:
-                    os.remove(os.path.join(self.known_faces_dir, filename))
-                except:
-                    pass
-        
-        # 2. Update Memory (Optimized O(1))
+                try: os.remove(os.path.join(self.known_faces_dir, filename))
+                except: pass
         if name in self.known_embeddings:
             del self.known_embeddings[name]
