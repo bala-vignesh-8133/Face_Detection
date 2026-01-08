@@ -127,7 +127,14 @@ class MonitorView(QWidget):
                 authorized = res['authorized']
                 
                 # Determine state and color
-                if authorized:
+                if name == "FAKE / SPOOF":
+                    color = (0, 0, 255) # Red
+                    display_name = "SPOOF DETECTED"
+                    self.update_panel("FAKE FACE", accuracy, False, is_spoof=True)
+                    detected_target = True
+                    # Optional: Log spoof attempt
+                    
+                elif authorized:
                     color = (0, 255, 0) # Green
                     display_name = name.upper()
                     self.update_panel(name, accuracy, True)
@@ -201,12 +208,15 @@ class MonitorView(QWidget):
         finally:
             self.render_finished.emit()
 
-    def update_panel(self, name, conf, authorized):
+    def update_panel(self, name, conf, authorized, is_spoof=False):
         self.lbl_name.setText(name)
         self.lbl_conf.setText(f"{int(conf*100)}%")
         self.lbl_time.setText(QDateTime.currentDateTime().toString("HH:mm:ss"))
         
-        if authorized:
+        if is_spoof:
+            self.lbl_status.setText("SPOOF DETECTED")
+            self.lbl_status.setStyleSheet(f"color: {Theme.DANGER}; font-size: 16px; font-weight: 800;")
+        elif authorized:
             self.lbl_status.setText("AUTHORIZED")
             self.lbl_status.setStyleSheet(f"color: {Theme.ACCENT}; font-size: 16px; font-weight: 800;")
         else:

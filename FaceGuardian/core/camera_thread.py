@@ -86,16 +86,33 @@ class CameraThread(QThread):
                 if faces is not None:
                     for face in faces:
                         x, y, w, h = map(int, face[:4])
+                        
+                        # 2. Recognition
                         try:
                             name, confidence = self.engine.recognize(frame, face)
                         except:
                             name, confidence = "Unknown", 0.0
                         
+                        # 3. Liveness Check (Anti-Spoofing)
+                        is_real, liveness_score = self.engine.check_liveness(frame, face)
+                        
+                        # Logic: If authorized but Fake, override name to SPOOF
+                        final_status = False
+                        display_name = name
+                        
+                        if name != "Unknown":
+                            if not is_real:
+                                display_name = "FAKE / SPOOF"
+                                final_status = False # Deny Access
+                            else:
+                                final_status = True  # Access Granted
+                        
                         results.append({
                             'rect': (x, y, w, h),
-                            'name': name,
+                            'name': display_name,
                             'distance': confidence,
-                            'authorized': name != "Unknown"
+                            'authorized': final_status,
+                            'liveness': liveness_score
                         })
                 self.last_results = results
             else:

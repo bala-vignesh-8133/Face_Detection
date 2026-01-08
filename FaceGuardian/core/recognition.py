@@ -32,9 +32,16 @@ class FaceRecognitionEngine:
                     self.rec_model_path, "", 
                     cv2.dnn.DNN_BACKEND_CUDA, cv2.dnn.DNN_TARGET_CUDA
                 )
-                self.liveness_net = cv2.dnn.readNetFromONNX(self.liveness_model_path)
-                self.liveness_net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-                self.liveness_net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+                
+                # Liveness (Optional)
+                try:
+                    self.liveness_net = cv2.dnn.readNetFromONNX(self.liveness_model_path)
+                    self.liveness_net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+                    self.liveness_net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+                    self.liveness_enabled = True
+                except:
+                    print("⚠️ Liveness Model not found or CUDA incompatible. Liveness check disabled.")
+                    self.liveness_enabled = False
                 
                 # TEST RUN
                 dummy_img = np.zeros((320, 320, 3), dtype=np.uint8)
@@ -48,7 +55,14 @@ class FaceRecognitionEngine:
                     self.detect_model_path, "", self.input_size, 0.5, 0.3, 5000
                 )
                 self.recognizer = cv2.FaceRecognizerSF.create(self.rec_model_path, "")
-                self.liveness_net = cv2.dnn.readNetFromONNX(self.liveness_model_path)
+                
+                try:
+                    self.liveness_net = cv2.dnn.readNetFromONNX(self.liveness_model_path)
+                    self.liveness_enabled = True
+                except:
+                    print("⚠️ Liveness Model not found. Liveness check disabled.")
+                    self.liveness_enabled = False
+                    
                 self.backend_name = "CPU (Optimized)"
             print(f"✅ AI Engine Initialized [{self.backend_name}]")
             
@@ -148,6 +162,9 @@ class FaceRecognitionEngine:
         Check if the face is real or a spoof (photo/screen/mask).
         Returns (is_real, score) where score > threshold means real.
         """
+        if not getattr(self, 'liveness_enabled', False):
+            return True, 1.0
+
         try:
             # 1. Expand box slightly (MiniFASNet expects context)
             x, y, w, h = map(int, face_box[:4])
