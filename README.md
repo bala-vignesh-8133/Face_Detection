@@ -1,4 +1,4 @@
-# One-Shot Face Recognition System bala tha pooley
+# One-Shot Face Recognition System bala
 
 A face recognition system using the **Matrix/Vector Distance method** with 128-dimensional embedding vectors and Euclidean distance calculations.
 

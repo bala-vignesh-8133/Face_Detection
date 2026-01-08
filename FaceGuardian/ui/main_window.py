@@ -16,6 +16,8 @@ from ui.database_view import DatabaseView
 from ui.dashboard_view import DashboardView
 from ui.alerts_view import AlertsView
 from ui.login_dialog import LoginDialog
+from ui.settings_view import SettingsView
+from ui.image_scan_view import ImageScanView
 from ui.styles import Theme
 
 class MainWindow(QMainWindow):
@@ -74,6 +76,8 @@ class MainWindow(QMainWindow):
         self.database_view = DatabaseView(self.engine) # Will be renamed in UI to "Manage Employees"
         self.dashboard_view = DashboardView(self.engine)
         self.alerts_view = AlertsView(self.engine)
+        self.settings_view = SettingsView(self.camera_thread)
+        self.image_scan_view = ImageScanView(self.engine)
         
         # Add to stack 
         # 0: Dashboard (Real)
@@ -86,10 +90,15 @@ class MainWindow(QMainWindow):
         self.content_area.addWidget(self.database_view)
         # 4: Alerts (Real)
         self.content_area.addWidget(self.alerts_view)
+        # 5: Settings
+        self.content_area.addWidget(self.settings_view)
+        # 6: Image Scanner
+        self.content_area.addWidget(self.image_scan_view)
         
         # --- Connections ---
         self.monitor_view.render_finished.connect(self.camera_thread.set_render_finished)
         self.register_view.render_finished.connect(self.camera_thread.set_render_finished)
+        self.camera_thread.camera_changed.connect(self.monitor_view.update_camera_info)
         
         self.register_view.user_registered.connect(self.database_view.refresh_list)
         self.database_view.database_changed.connect(self.engine.reload_known_faces)
@@ -130,10 +139,11 @@ class MainWindow(QMainWindow):
         items = [
             ("Dashboard", "fa5s.chart-line", 0),
             ("Live Monitor", "fa5s.video", 1),
+            ("Neural Scanner", "fa5s.search", 6),
             ("Add Employee", "fa5s.user-plus", 2),
             ("Manage Employees", "fa5s.users", 3),
             ("Security Alerts", "fa5s.bell", 4),
-            ("System Settings", "fa5s.cog", 0), # Mapping to Dashboard for now
+            ("System Settings", "fa5s.cog", 5),
         ]
         
         for text, icon, idx in items:
