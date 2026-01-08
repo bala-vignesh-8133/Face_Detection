@@ -17,6 +17,7 @@ from ui.dashboard_view import DashboardView
 from ui.alerts_view import AlertsView
 from ui.login_dialog import LoginDialog
 from ui.settings_view import SettingsView
+from ui.image_scan_view import ImageScanView
 from ui.styles import Theme
 
 class MainWindow(QMainWindow):
@@ -76,6 +77,7 @@ class MainWindow(QMainWindow):
         self.dashboard_view = DashboardView(self.engine)
         self.alerts_view = AlertsView(self.engine)
         self.settings_view = SettingsView(self.camera_thread)
+        self.image_scan_view = ImageScanView(self.engine)
         
         # Add to stack 
         # 0: Dashboard (Real)
@@ -90,6 +92,8 @@ class MainWindow(QMainWindow):
         self.content_area.addWidget(self.alerts_view)
         # 5: Settings
         self.content_area.addWidget(self.settings_view)
+        # 6: Image Scanner
+        self.content_area.addWidget(self.image_scan_view)
         
         # --- Connections ---
         self.monitor_view.render_finished.connect(self.camera_thread.set_render_finished)
@@ -135,6 +139,7 @@ class MainWindow(QMainWindow):
         items = [
             ("Dashboard", "fa5s.chart-line", 0),
             ("Live Monitor", "fa5s.video", 1),
+            ("Neural Scanner", "fa5s.search", 6),
             ("Add Employee", "fa5s.user-plus", 2),
             ("Manage Employees", "fa5s.users", 3),
             ("Security Alerts", "fa5s.bell", 4),

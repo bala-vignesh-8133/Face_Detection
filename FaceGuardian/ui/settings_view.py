@@ -1,6 +1,5 @@
-
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QComboBox, QFrame, QHBoxLayout, QPushButton, QMessageBox
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QComboBox, QFrame, QHBoxLayout, QPushButton, QMessageBox, QFileDialog
+from PyQt6.QtCore import Qt, QTimer
 from ui.styles import Theme
 
 class SettingsView(QWidget):
@@ -49,6 +48,21 @@ class SettingsView(QWidget):
         self.current_cam_lbl.setStyleSheet(f"color: {Theme.ACCENT}; font-weight: bold; font-size: 11px;")
         cc_layout.addWidget(self.current_cam_lbl)
         
+        # New: File selection for monitoring
+        cc_layout.addSpacing(10)
+        file_box = QHBoxLayout()
+        v_label = QLabel("MONITOR RECORDED FOOTAGE")
+        v_label.setStyleSheet(f"color: {Theme.TEXT_SUB}; font-size: 10px; font-weight: bold;")
+        file_box.addWidget(v_label)
+        file_box.addStretch()
+        
+        self.open_file_btn = QPushButton("OPEN VIDEO FILE...")
+        self.open_file_btn.setStyleSheet(f"background-color: {Theme.SURFACE_HOVER}; border: 1px solid {Theme.BORDER}; padding: 8px;")
+        self.open_file_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.open_file_btn.clicked.connect(self.select_video_file)
+        file_box.addWidget(self.open_file_btn)
+        cc_layout.addLayout(file_box)
+
         help_text = QLabel("Note: On Windows, switching uses High-Speed DSHOW for minimum delay.")
         help_text.setStyleSheet(f"color: {Theme.TEXT_SUB}; font-size: 11px; font-style: italic;")
         cc_layout.addWidget(help_text)
@@ -73,9 +87,22 @@ class SettingsView(QWidget):
         self.camera_thread.change_camera(new_index)
         self.current_cam_lbl.setText(f"Currently Active: Source #{new_index}")
         
-        # Short delay to allow hardware to init before re-enabling
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(1500, lambda: self.reset_btn())
+        QTimer.singleShot(1500, self.reset_btn)
+
+    def select_video_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Video", "", "Videos (*.mp4 *.avi *.mkv *.mov)"
+        )
+        if file_path:
+            self.save_btn.setText("LOADING VIDEO FOOTAGE...")
+            self.save_btn.setEnabled(False)
+            self.camera_thread.change_camera(file_path)
+            
+            import os
+            fname = os.path.basename(file_path)
+            self.current_cam_lbl.setText(f"Active: {fname}")
+            
+            QTimer.singleShot(1500, self.reset_btn)
 
     def reset_btn(self):
         self.save_btn.setText("APPLY HARDWARE CHANGES")
