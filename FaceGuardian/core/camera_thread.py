@@ -6,13 +6,17 @@ from PyQt6.QtCore import QThread, pyqtSignal
 class CameraThread(QThread):
     # frame, results
     frame_ready = pyqtSignal(np.ndarray, list)
+    camera_changed = pyqtSignal(str) # Emits camera name/index
 
-    def __init__(self, engine):
+    def __init__(self, engine, camera_index=0):
         super().__init__()
         self.engine = engine
+        self.camera_index = camera_index
         self.running = True
         self.cap = None
         self._render_pending = False
+        self._camera_switch_pending = False
+        self._new_index = 0
 
     def set_render_finished(self):
         self._render_pending = False
@@ -21,20 +25,36 @@ class CameraThread(QThread):
         """Force reset throttle when changing views to prevent deadlock"""
         self._render_pending = False
 
+    def change_camera(self, index):
+        """Request a camera switch and break current read loop if possible"""
+        self._new_index = index
+        self._camera_switch_pending = True
+        # Proactively release to break a blocking read() if necessary
+        if self.cap:
+            self.cap.release()
+            self.cap = None
+
     def run(self):
-        self.cap = cv2.VideoCapture(0)
-        # OPTIMIZATION: Force 640x480 to prevent lag on high-res webcams
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        # CRITICAL: Set buffer size to 1 to reduce latency (Subject to driver support)
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        self._open_camera()
         
         self.frame_count = 0
         self.last_results = []
         
         while self.running:
+            # Handle Camera Switch (Now faster because change_camera releases cap)
+            if self._camera_switch_pending:
+                self.camera_index = self._new_index
+                self._open_camera()
+                self._camera_switch_pending = False
+                self.camera_changed.emit(f"Source #{self.camera_index}")
+
+            if not self.cap or not self.cap.isOpened():
+                time.sleep(0.01) # Faster polling
+                continue
+
             ret, frame = self.cap.read()
             if not ret:
+                # If read fails, wait briefly or retry opening (handles unplugged USB)
                 time.sleep(0.01)
                 continue
 
@@ -85,7 +105,26 @@ class CameraThread(QThread):
             self._render_pending = True
             self.frame_ready.emit(frame, results)
             
-        self.cap.release()
+        if self.cap:
+            self.cap.release()
+
+    def _open_camera(self):
+        # Already released in change_camera for speed, but double check
+        if self.cap:
+            self.cap.release()
+        
+        # Open with DSHOW backend on Windows for faster init
+        self.cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
+        
+        if not self.cap.isOpened():
+            # Fallback for other systems
+            self.cap = cv2.VideoCapture(self.camera_index)
+
+        # OPTIMIZATION: Force 640x480 to prevent lag on high-res webcams
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        # CRITICAL: Set buffer size to 1 to reduce latency (Subject to driver support)
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
     def stop(self):
         self.running = False
