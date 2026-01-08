@@ -22,7 +22,7 @@ class CameraThread(QThread):
         self._render_pending = False
 
     def run(self):
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture(0)  # External USB webcam detected at index 0
         # OPTIMIZATION: Force 640x480 to prevent lag on high-res webcams
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
