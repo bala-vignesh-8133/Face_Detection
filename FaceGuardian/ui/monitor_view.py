@@ -4,9 +4,10 @@ import os
 import time
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QGridLayout, QSizePolicy
 from PyQt6.QtGui import QImage, QPixmap
-from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QDateTime
+from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QDateTime, QSize
 from ui.styles import Theme
 import qtawesome as qta
+from core.email_notifier import EmailNotifier
 
 class MonitorView(QWidget):
     # Signal to tell camera thread we are ready for next frame
@@ -19,6 +20,9 @@ class MonitorView(QWidget):
         self.alerts_dir = "alerts"
         if not os.path.exists(self.alerts_dir):
             os.makedirs(self.alerts_dir)
+        
+        # Initialize email notifier
+        self.email_notifier = EmailNotifier()
             
         self.init_ui()
 
@@ -234,3 +238,6 @@ class MonitorView(QWidget):
         # Save frame with bounding box
         cv2.imwrite(filepath, frame)
         print(f"[ALERT] Intruder Captured! Saved to {filepath}")
+        
+        # Send email alert in background (non-blocking)
+        self.email_notifier.send_alert(filepath, name)
