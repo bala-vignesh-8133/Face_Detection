@@ -12,5 +12,26 @@
         "dept": "IT",
         "joined": "2026-01-08 11:00:35",
         "status": "Active"
+    },
+    "Jason Ezra": {
+        "id": "1235",
+        "role": "developer",
+        "dept": "IT",
+        "joined": "2026-01-09 10:52:03",
+        "status": "Active"
+    },
+    "Jason": {
+        "id": "1235",
+        "role": "it",
+        "dept": "IT",
+        "joined": "2026-01-09 10:53:38",
+        "status": "Active"
+    },
+    "jason": {
+        "id": "34",
+        "role": "it",
+        "dept": "IT",
+        "joined": "2026-01-09 10:54:53",
+        "status": "Active"
     }
 }

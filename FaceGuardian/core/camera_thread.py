@@ -86,6 +86,7 @@ class CameraThread(QThread):
                 if faces is not None:
                     for face in faces:
                         x, y, w, h = map(int, face[:4])
+                        
                         try:
                             name, confidence = self.engine.recognize(frame, face)
                         except:
@@ -120,9 +121,15 @@ class CameraThread(QThread):
             self.cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
             if not self.cap.isOpened():
                 self.cap = cv2.VideoCapture(self.camera_index)
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            
+            # 720p HD - Perfect balance of quality and performance
+            # High enough for long-distance detection, fast enough for real-time AI
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce latency
+            
+            # Optional: Set FPS to 30 for smoother video
+            self.cap.set(cv2.CAP_PROP_FPS, 30)
         else:
             # Video File
             self.cap = cv2.VideoCapture(self.camera_index)

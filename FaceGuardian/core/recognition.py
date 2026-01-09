@@ -24,7 +24,7 @@ class FaceRecognitionEngine:
             try:
                 print("Attempting to use NVIDIA GPU (CUDA)...")
                 self.detector = cv2.FaceDetectorYN.create(
-                    self.detect_model_path, "", self.input_size, 0.5, 0.3, 5000, 
+                    self.detect_model_path, "", self.input_size, 0.65, 0.3, 5000, 
                     cv2.dnn.DNN_BACKEND_CUDA, cv2.dnn.DNN_TARGET_CUDA
                 )
                 self.recognizer = cv2.FaceRecognizerSF.create(
@@ -44,7 +44,7 @@ class FaceRecognitionEngine:
                 # 3. Fallback to CPU (Tested & Verified Lag-Free)
                 print(f"CUDA Failed ({cuda_err}). Switching to CPU (High Performance).")
                 self.detector = cv2.FaceDetectorYN.create(
-                    self.detect_model_path, "", self.input_size, 0.5, 0.3, 5000
+                    self.detect_model_path, "", self.input_size, 0.65, 0.3, 5000
                 )
                 self.recognizer = cv2.FaceRecognizerSF.create(self.rec_model_path, "")
                 self.backend_name = "CPU (Optimized)"
@@ -117,9 +117,27 @@ class FaceRecognitionEngine:
         ret, faces = self.detector.detect(image)
         
         if faces is not None:
-             pass
+            # Filter out false positives while allowing distant faces
+            filtered_faces = []
+            for face in faces:
+                x, y, w_face, h_face = map(int, face[:4])
+                confidence = face[14]  # Detection confidence score
+                
+                # Filter criteria:
+                # 1. Face must be at least 25x25 pixels (allows detection at door ~3-4 meters)
+                # 2. Confidence must be > 0.65 (balanced threshold)
+                # 3. Aspect ratio should be reasonable (0.6 to 1.6) - wider range for angles
+                aspect_ratio = w_face / h_face if h_face > 0 else 0
+                
+                # Allow smaller faces but with stricter aspect ratio to avoid hands
+                if (w_face >= 25 and h_face >= 25 and 
+                    confidence > 0.65 and 
+                    0.6 <= aspect_ratio <= 1.6):
+                    filtered_faces.append(face)
+            
+            return filtered_faces
              
-        return faces if faces is not None else []
+        return []
 
     def register_new_face(self, name: str, image: np.ndarray, append: bool = False) -> bool:
         faces = self.detect_faces(image)
