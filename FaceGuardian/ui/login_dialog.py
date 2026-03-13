@@ -107,7 +107,7 @@ class LoginDialog(QDialog):
         layout.addWidget(logo_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # ===== Title Badge =====
-        title = QLabel("RAMCO MILLS SECURITY SYSTEM")
+        title = QLabel("Missing Child Detection System")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("""
             QLabel {
