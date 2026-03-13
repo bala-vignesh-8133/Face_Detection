@@ -71,6 +71,8 @@ class DatabaseView(QWidget):
             age = child_data.get("age", "Unknown Age")
             location = child_data.get("last_seen_location", "Unknown Location")
             date_missing = child_data.get("date_missing", "Unknown Date")
+            aadhar = child_data.get("aadhar_number", "Not Provided")
+            status = child_data.get("status", "Missing")
             
             # Create a robust container widget
             container = QFrame()
@@ -115,20 +117,49 @@ class DatabaseView(QWidget):
             name_label.setStyleSheet(f"font-weight: 800; color: {Theme.TEXT_MAIN}; font-size: 16px; border: none; background: transparent;")
             info_layout.addWidget(name_label)
             
-            details = QLabel(f"Age: {age}  |  Last Seen: {location}  |  Missing Since: {date_missing}")
-            details.setStyleSheet(f"color: {Theme.PRIMARY}; font-size: 12px; font-weight: bold; border: none; background: transparent;")
+            details = QLabel(f"Age: {age}  |  Last Seen: {location}  |  Missing Since: {date_missing}\nAadhar: {aadhar}  |  Status: {status.upper()}")
+            
+            if status == "Active":
+                details.setStyleSheet(f"color: {Theme.PRIMARY}; font-size: 12px; font-weight: bold; border: none; background: transparent;")
+            else:
+                details.setStyleSheet(f"color: {Theme.WARNING}; font-size: 12px; font-weight: bold; border: none; background: transparent;")
+                
             info_layout.addWidget(details)
             
             layout.addLayout(info_layout)
             layout.addStretch()
             
-            # Delete button
+            # Action Buttons Layout
+            action_layout = QVBoxLayout()
+            
+            # 1. Approve Button (Only visible if Pending and user is Police/Admin)
+            role = self.window().role if hasattr(self.window(), 'role') else "Volunteer"
+            if status != "Active" and role in ["Police", "Government"]:
+                approve_btn = QPushButton("Approve Case")
+                approve_btn.setFixedWidth(140)
+                approve_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                approve_btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {Theme.SUCCESS};
+                        color: #ffffff;
+                        border-radius: 6px;
+                        font-weight: bold;
+                        padding: 8px;
+                    }}
+                    QPushButton:hover {{ background-color: #2fb56e; }}
+                """)
+                approve_btn.clicked.connect(lambda checked, n=name: self.approve_user(n))
+                action_layout.addWidget(approve_btn)
+
+            # 2. Delete button
             del_btn = QPushButton("Close Case")
             del_btn.setObjectName("SecondaryButton")
             del_btn.setFixedWidth(140)
             del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             del_btn.clicked.connect(lambda checked, n=name: self.delete_user(n))
-            layout.addWidget(del_btn)
+            action_layout.addWidget(del_btn)
+            
+            layout.addLayout(action_layout)
             
             # Set widget for item
             item.setSizeHint(container.sizeHint())
@@ -136,6 +167,21 @@ class DatabaseView(QWidget):
             self.user_list.setItemWidget(item, container)
             
         self.stats_label.setText(f"Total Active Cases: {len(users)}")
+
+    def approve_user(self, name):
+        reply = QMessageBox.question(self, 'Confirm Approval', 
+                                    f"Approve '{name}'? This will immediately activate their facial recognition on all surveillance cameras.",
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            # Update DB
+            self.child_manager.approve_child(name)
+            
+            # Reload the RAM embeddings
+            self.engine.reload_known_faces()
+            
+            self.refresh_list()
+            self.database_changed.emit()
+            QMessageBox.information(self, "Success", f"Case '{name}' Approved and Active!")
 
     def delete_user(self, name):
         reply = QMessageBox.question(self, 'Confirm Case Closure', 

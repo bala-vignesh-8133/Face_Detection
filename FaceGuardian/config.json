@@ -1,7 +1,7 @@
 {
     "sender_email": "v2573880@gmail.com",
     "sender_password": "8903590156d28072005",
-    "recipient_email": "953623244004@ritrjpm.ac.in",
+    "recipient_email": "953623244024@ritrjpm.ac.in",
     "smtp_server": "smtp.gmail.com",
     "smtp_port": 587,
     "alert_cooldown_minutes": 5,

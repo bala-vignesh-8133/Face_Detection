@@ -103,6 +103,33 @@ class ImageScanView(QWidget):
         if results_text:
             self.results_label.setText(f"Analysis Complete: Found {len(results_text)} missing child match(es) -> " + ", ".join(results_text))
             self.results_label.setStyleSheet(f"color: {Theme.DANGER}; font-weight: bold;")
+            
+            # --- Auto Email Trigger (Confidence > 50%) ---
+            highest_conf_name = None
+            max_conf = 0
+            for text in results_text:
+                # text format: "MATCH: Name [XX%]"
+                try:
+                    conf_val = int(text.split("[")[1].split("%")[0])
+                    name_val = text.split("MATCH: ")[1].split(" [")[0]
+                    if conf_val > max_conf:
+                        max_conf = conf_val
+                        highest_conf_name = name_val
+                except: pass
+                
+            if max_conf > 50:
+                print(f"[VERIFIER] Confidence {max_conf}% > 50%. Triggering Auto-Email...")
+                try:
+                    # Save a temp image for the email attachment
+                    temp_path = "temp_scan_alert.jpg"
+                    cv2.imwrite(temp_path, image)
+                    
+                    from core.email_notifier import EmailNotifier
+                    notifier = EmailNotifier()
+                    notifier.send_alert(temp_path, highest_conf_name)
+                except Exception as e:
+                    print(f"[VERIFIER] Failed to send auto-email: {e}")
+            
         else:
             self.results_label.setText("Analysis Complete: No missing child records match.")
             self.results_label.setStyleSheet(f"color: {Theme.ACCENT}; font-weight: bold;")

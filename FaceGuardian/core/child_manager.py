@@ -22,16 +22,22 @@ class ChildManager:
         with open(self.db_file, 'w') as f:
             json.dump(self.children, f, indent=4)
 
-    def add_child(self, name, age, last_seen, date_missing, contact):
+    def add_child(self, name, age, last_seen, date_missing, contact, aadhar, status="Pending Approval"):
         self.children[name] = {
             "age": age,
             "last_seen_location": last_seen,
             "date_missing": date_missing,
             "guardian_contact": contact,
+            "aadhar_number": aadhar,
             "reported_on": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "status": "Missing"
+            "status": status
         }
         self.save_db()
+
+    def approve_child(self, name):
+        if name in self.children:
+            self.children[name]["status"] = "Active"
+            self.save_db()
 
     def get_child(self, name):
         return self.children.get(name, {})

@@ -66,6 +66,11 @@ class RegisterView(QWidget):
         self.date_missing_input.setPlaceholderText("e.g. 2026-03-12")
         f_layout.addWidget(self.date_missing_input)
 
+        f_layout.addWidget(self.create_label("AADHAR NUMBER"))
+        self.aadhar_input = QLineEdit()
+        self.aadhar_input.setPlaceholderText("e.g. 1234 5678 9012")
+        f_layout.addWidget(self.aadhar_input)
+
         f_layout.addWidget(self.create_label("GUARDIAN CONTACT"))
         self.contact_input = QLineEdit()
         self.contact_input.setPlaceholderText("e.g. +1 555-0199")
@@ -143,9 +148,10 @@ class RegisterView(QWidget):
         last_seen = self.last_seen_input.text().strip()
         date_missing = self.date_missing_input.text().strip()
         contact = self.contact_input.text().strip()
+        aadhar = self.aadhar_input.text().strip()
         
-        if not name or not age or not contact:
-            QMessageBox.warning(self, "Validation Error", "Name, Age, and Contact are required.")
+        if not name or not age or not contact or not aadhar:
+            QMessageBox.warning(self, "Validation Error", "Name, Age, Contact, and Aadhar Number are required.")
             return
             
         if self.current_frame is None:
@@ -153,15 +159,24 @@ class RegisterView(QWidget):
             return
 
         is_append = self.append_check.isChecked()
+        role = self.window().role 
+
+        # We need to tell the engine if it should cache this face in RAM immediately
+        # Volunteers cannot make faces instantly active on cameras; they require Police approval.
+        is_active = role in ["Police", "Government"]
         
         # AI Registration
-        success = self.engine.register_new_face(name, self.current_frame, append=is_append)
+        success = self.engine.register_new_face(name, self.current_frame, append=is_append, activate=is_active)
         
         if success:
             # Save Metadata
-            self.child_manager.add_child(name, age, last_seen, date_missing, contact)
+            status = "Active" if is_active else "Pending Approval"
+            self.child_manager.add_child(name, age, last_seen, date_missing, contact, aadhar, status)
             
-            QMessageBox.information(self, "Success", f"Missing child '{name}' reported successfully. The face has been added to the neural database.")
+            if is_active:
+                QMessageBox.information(self, "Success", f"Missing child '{name}' reported successfully. The face is now active on the network.")
+            else:
+                QMessageBox.information(self, "Success", f"Missing child '{name}' reported successfully. The case is now awaiting Police Approval.")
             
             # Clear fields
             self.name_input.clear()
@@ -169,6 +184,7 @@ class RegisterView(QWidget):
             self.last_seen_input.clear()
             self.date_missing_input.clear()
             self.contact_input.clear()
+            self.aadhar_input.clear()
             self.append_check.setChecked(False)
             self.current_frame = None
             self.image_path = None

@@ -227,6 +227,28 @@ class MainWindow(QMainWindow):
         admin.setStyleSheet(f"font-weight: bold; padding-left: 20px; border-left: 1px solid {Theme.BORDER};")
         layout.addWidget(admin)
         
+        layout.addSpacing(15)
+        
+        # Logout Button
+        logout_btn = QPushButton(" Logout")
+        logout_btn.setIcon(qta.icon("fa5s.sign-out-alt", color=Theme.DANGER))
+        logout_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {Theme.DANGER};
+                font-weight: bold;
+                border: 1px solid {Theme.DANGER};
+                border-radius: 6px;
+                padding: 5px 10px;
+            }}
+            QPushButton:hover {{
+                background-color: rgba(255, 77, 77, 0.1);
+            }}
+        """)
+        logout_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        logout_btn.clicked.connect(self.logout_user)
+        layout.addWidget(logout_btn)
+        
         self.right_layout.addWidget(self.topbar)
         
         # Timer for clock
@@ -234,6 +256,17 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.update_time)
         self.timer.start(1000)
         self.update_time()
+
+    def logout_user(self):
+        # Stop the camera thread
+        self.camera_thread.stop()
+        self.close()
+        
+        # Restart the application workflow by re-opening the login dialog
+        import sys
+        import os
+        # The cleanest way to restart the app in PyQt is to relaunch the executable script
+        os.execl(sys.executable, sys.executable, "main.py")
 
     def update_time(self):
         now = QDateTime.currentDateTime()

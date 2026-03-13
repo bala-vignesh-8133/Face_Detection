@@ -93,12 +93,35 @@ class CameraThread(QThread):
                         except:
                             name, confidence = "Unknown", 0.0
                         
+                        is_match = name != "Unknown"
                         results.append({
                             'rect': (x, y, w, h),
                             'name': name,
                             'distance': confidence,
-                            'authorized': name != "Unknown"
+                            'authorized': is_match
                         })
+                        
+                        # --- Auto Email Trigger for Live Feed ---
+                        if is_match and confidence > 0.50:
+                            try:
+                                from core.email_notifier import EmailNotifier
+                                notifier = EmailNotifier()
+                                # The notifier has a built-in cooldown (default 60s)
+                                # so it won't spam if the child stands in front of the camera for 5 minutes.
+                                if notifier.can_send_email():
+                                    print(f"[LIVE FEED] Missing Child Spotted! {name} ({int(confidence*100)}%). Sending Alert...")
+                                    temp_path = "temp_live_alert.jpg"
+                                    
+                                    # Draw a quick box for the email picture (just on the saved copy)
+                                    alert_img = frame.copy()
+                                    cv2.rectangle(alert_img, (x, y), (x+w, y+h), (0, 0, 255), 3)
+                                    cv2.putText(alert_img, f"MATCH: {name}", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                                    
+                                    cv2.imwrite(temp_path, alert_img)
+                                    notifier.send_alert(temp_path, name)
+                            except Exception as e:
+                                print(f"[LIVE FEED] Email failed: {e}")
+                                
                 self.last_results = results
             else:
                 results = self.last_results
