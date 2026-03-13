@@ -12,6 +12,10 @@ from core.email_notifier import EmailNotifier
 class MonitorView(QWidget):
     # Signal to tell camera thread we are ready for next frame
     render_finished = pyqtSignal()
+    
+    # Signal to notify other views (like AlertsView) of a new event
+    # Format: (title, location, time, color, name_for_display)
+    new_alert = pyqtSignal(str, str, str, str, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -130,16 +134,18 @@ class MonitorView(QWidget):
                 distance = result['distance']
                 authorized = result['authorized']
                 
-                if authorized:
-                    color = (0, 255, 0)  # Green for authorized
-                    display_label = f"{name} [{int(distance*100)}%]"
-                    status_text = "AUTHORIZED"
-                    status_color = Theme.ACCENT
-                else:
-                    color = (0, 0, 255)  # Red for unauthorized
-                    display_label = f"{name}"
-                    status_text = "UNAUTHORIZED"
+                is_match = authorized
+                
+                if is_match:
+                    color = (0, 0, 255)  # Red for missing child match
+                    display_label = f"MATCH: {name} [{int(distance*100)}%]"
+                    status_text = "MATCH FOUND"
                     status_color = Theme.DANGER
+                else:
+                    color = (0, 255, 0)  # Green for unknown (safe)
+                    display_label = f"Unknown"
+                    status_text = "SCANNING"
+                    status_color = Theme.ACCENT
                 
                 detected_target = True
 
@@ -174,11 +180,11 @@ class MonitorView(QWidget):
                 # Update info panel
                 self.update_panel(name, distance, status_text, status_color)
                 
-                # Capture unauthorized faces with 60-second cooldown
-                if not authorized:
+                # Capture missing child match with 60-second cooldown
+                if is_match:
                     current_time = time.time()
                     if current_time - self.last_capture_time > 60:  # 1 minute cooldown
-                        self.capture_intruder(frame.copy(), x, y, w, h, name)
+                        self.capture_match(frame.copy(), x, y, w, h, name)
                         self.last_capture_time = current_time
             
             if not detected_target:
@@ -219,10 +225,10 @@ class MonitorView(QWidget):
     def update_camera_info(self, name):
         self.lbl_camera.setText(name.upper())
 
-    def capture_intruder(self, frame, x, y, w, h, name):
-        """Capture unauthorized person with red bounding box drawn on image"""
+    def capture_match(self, frame, x, y, w, h, name):
+        """Capture missing child match with red bounding box drawn on image"""
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        filename = f"intruder_{timestamp}.jpg"
+        filename = f"match_{timestamp}.jpg"
         filepath = os.path.join(self.alerts_dir, filename)
         
         # Draw RED bounding box on the frame
@@ -230,14 +236,23 @@ class MonitorView(QWidget):
         cv2.rectangle(frame, (x, y), (x+w, y+h), color, 3)
         
         # Draw label with name
-        label = f"UNAUTHORIZED: {name}"
+        label = f"MATCH: {name}"
         label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
         cv2.rectangle(frame, (x, y-30), (x + label_size[0] + 10, y), color, -1)
         cv2.putText(frame, label, (x + 5, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         
         # Save frame with bounding box
         cv2.imwrite(filepath, frame)
-        print(f"[ALERT] Intruder Captured! Saved to {filepath}")
+        print(f"[ALERT] Missing Child Match Captured! Saved to {filepath}")
+        
+        # Fire signal to update active UI
+        self.new_alert.emit(
+            "Missing Child Match",
+            "RIT CSBS Floor Camera",
+            time.strftime("%Y-%m-%d %H:%M:%S"),
+            Theme.DANGER,
+            name
+        )
         
         # Send email alert in background (non-blocking)
         self.email_notifier.send_alert(filepath, name)

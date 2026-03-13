@@ -4,20 +4,20 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QListWidget, QListWidg
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from ui.styles import Theme
-from core.employee_manager import EmployeeManager
+from core.child_manager import ChildManager
 
 class DatabaseView(QWidget):
     """
-    Admin View: Manage Employees.
-    Lists registered employees with their ID/Role metadata.
-    Allows revoking access (deletion).
+    Admin View: Manage Missing Children Records.
+    Lists registered children with their metadata.
+    Allows closing cases (deletion).
     """
     database_changed = pyqtSignal()
 
     def __init__(self, engine, parent=None):
         super().__init__(parent)
         self.engine = engine
-        self.emp_manager = EmployeeManager()
+        self.child_manager = ChildManager()
         self.init_ui()
 
     def showEvent(self, event):
@@ -29,11 +29,11 @@ class DatabaseView(QWidget):
         layout.setContentsMargins(30, 30, 30, 30)
         
         # Header
-        header = QLabel("Manage Employees")
+        header = QLabel("Missing Children Database")
         header.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {Theme.TEXT_MAIN};")
         layout.addWidget(header)
         
-        sub = QLabel("View and manage authorized personnel credentials.")
+        sub = QLabel("View and manage missing child records active in the system.")
         sub.setStyleSheet(f"color: {Theme.TEXT_SUB}; font-size: 14px;")
         layout.addWidget(sub)
         
@@ -45,7 +45,7 @@ class DatabaseView(QWidget):
         layout.addWidget(self.user_list)
         
         # Footer / Stats
-        self.stats_label = QLabel("Total Registered: 0")
+        self.stats_label = QLabel("Total Active Cases: 0")
         self.stats_label.setStyleSheet(f"color: {Theme.ACCENT}; font-weight: bold;")
         layout.addWidget(self.stats_label)
         
@@ -55,7 +55,7 @@ class DatabaseView(QWidget):
         self.user_list.clear()
         
         # Refresh DB
-        self.emp_manager.load_db()
+        self.child_manager.load_db()
         
         if not os.path.exists(self.engine.known_faces_dir):
             os.makedirs(self.engine.known_faces_dir)
@@ -67,10 +67,10 @@ class DatabaseView(QWidget):
             item = QListWidgetItem(self.user_list)
             
             # Fetch Metadata
-            emp_data = self.emp_manager.get_employee(name)
-            emp_id = emp_data.get("id", "N/A")
-            role = emp_data.get("role", "Unauthorized")
-            dept = emp_data.get("dept", "Unknown")
+            child_data = self.child_manager.get_child(name)
+            age = child_data.get("age", "Unknown Age")
+            location = child_data.get("last_seen_location", "Unknown Location")
+            date_missing = child_data.get("date_missing", "Unknown Date")
             
             # Create a robust container widget
             container = QFrame()
@@ -115,7 +115,7 @@ class DatabaseView(QWidget):
             name_label.setStyleSheet(f"font-weight: 800; color: {Theme.TEXT_MAIN}; font-size: 16px; border: none; background: transparent;")
             info_layout.addWidget(name_label)
             
-            details = QLabel(f"ID: {emp_id}  |  {role}  |  {dept}")
+            details = QLabel(f"Age: {age}  |  Last Seen: {location}  |  Missing Since: {date_missing}")
             details.setStyleSheet(f"color: {Theme.PRIMARY}; font-size: 12px; font-weight: bold; border: none; background: transparent;")
             info_layout.addWidget(details)
             
@@ -123,8 +123,8 @@ class DatabaseView(QWidget):
             layout.addStretch()
             
             # Delete button
-            del_btn = QPushButton("Revoke Access")
-            del_btn.setObjectName("DangerButton")
+            del_btn = QPushButton("Close Case")
+            del_btn.setObjectName("SecondaryButton")
             del_btn.setFixedWidth(140)
             del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             del_btn.clicked.connect(lambda checked, n=name: self.delete_user(n))
@@ -135,20 +135,20 @@ class DatabaseView(QWidget):
             self.user_list.addItem(item)
             self.user_list.setItemWidget(item, container)
             
-        self.stats_label.setText(f"Total Registered: {len(users)}")
+        self.stats_label.setText(f"Total Active Cases: {len(users)}")
 
     def delete_user(self, name):
-        reply = QMessageBox.question(self, 'Confirm Revocation', 
-                                    f"Are you sure you want to PERMANENTLY remove '{name}' from the security database?",
+        reply = QMessageBox.question(self, 'Confirm Case Closure', 
+                                    f"Are you sure you want to completely remove the record for '{name}'? This usually means the child has been found.",
                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
         if reply == QMessageBox.StandardButton.Yes:
             # 1. Remove from Face Engine
             self.engine.delete_person(name)
             
-            # 2. Remove from Employee Database
-            self.emp_manager.delete_employee(name)
+            # 2. Remove from Child Database
+            self.child_manager.delete_child(name)
                 
             self.refresh_list()
             self.database_changed.emit()
-            QMessageBox.information(self, "Success", f"Access for '{name}' revoked.")
+            QMessageBox.information(self, "Success", f"Case for '{name}' closed successfully.")

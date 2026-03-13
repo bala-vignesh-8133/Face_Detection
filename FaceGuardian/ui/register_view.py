@@ -1,15 +1,15 @@
 import cv2
 import numpy as np
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QFrame, QMessageBox, QCheckBox, QSizePolicy, QComboBox
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QFrame, QMessageBox, QCheckBox, QSizePolicy, QComboBox, QFileDialog
 from PyQt6.QtGui import QImage, QPixmap
-from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from ui.styles import Theme
-from core.employee_manager import EmployeeManager
+from core.child_manager import ChildManager
 
 class RegisterView(QWidget):
     """
-    Admin View: Add New Employee.
-    Captures face + Metadata (ID, Role, Dept).
+    Reporting View: Add Missing Child Report.
+    Captures face + Metadata (Age, Contact, Location).
     """
     user_registered = pyqtSignal()
     render_finished = pyqtSignal()
@@ -17,8 +17,9 @@ class RegisterView(QWidget):
     def __init__(self, engine, parent=None):
         super().__init__(parent)
         self.engine = engine
-        self.emp_manager = EmployeeManager()
+        self.child_manager = ChildManager()
         self.current_frame = None
+        self.image_path = None
         self.init_ui()
 
     def init_ui(self):
@@ -33,11 +34,11 @@ class RegisterView(QWidget):
         f_layout.setContentsMargins(0,0,0,0)
         f_layout.setSpacing(15)
         
-        header = QLabel("Add New Employee")
+        header = QLabel("Report Missing Child")
         header.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {Theme.TEXT_MAIN};")
         f_layout.addWidget(header)
         
-        sub = QLabel("Register authorized personnel with full credentials.")
+        sub = QLabel("Register a missing child with a photo and details.")
         sub.setStyleSheet(f"color: {Theme.TEXT_SUB}; font-size: 14px;")
         sub.setWordWrap(True)
         f_layout.addWidget(sub)
@@ -45,26 +46,30 @@ class RegisterView(QWidget):
         f_layout.addSpacing(20)
         
         # Fields
-        f_layout.addWidget(self.create_label("EMPLOYEE ID"))
-        self.id_input = QLineEdit()
-        self.id_input.setPlaceholderText("e.g. EMP-2024-001")
-        f_layout.addWidget(self.id_input)
-        
-        f_layout.addWidget(self.create_label("FULL NAME"))
+        f_layout.addWidget(self.create_label("CHILD's FULL NAME"))
         self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("e.g. Sarah Connor")
+        self.name_input.setPlaceholderText("e.g. John Doe")
         f_layout.addWidget(self.name_input)
         
-        f_layout.addWidget(self.create_label("ROLE / DESIGNATION"))
-        self.role_input = QLineEdit()
-        self.role_input.setPlaceholderText("e.g. Security Chief")
-        f_layout.addWidget(self.role_input)
+        f_layout.addWidget(self.create_label("AGE (approximate)"))
+        self.age_input = QLineEdit()
+        self.age_input.setPlaceholderText("e.g. 5")
+        f_layout.addWidget(self.age_input)
         
-        f_layout.addWidget(self.create_label("DEPARTMENT"))
-        self.dept_input = QComboBox()
-        self.dept_input.addItems(["Security", "IT", "HR", "Management", "Operations", "Other"])
-        self.dept_input.setStyleSheet(Theme.GLOBAL_STYLES)
-        f_layout.addWidget(self.dept_input)
+        f_layout.addWidget(self.create_label("LAST SEEN LOCATION"))
+        self.last_seen_input = QLineEdit()
+        self.last_seen_input.setPlaceholderText("e.g. Central Park, NY")
+        f_layout.addWidget(self.last_seen_input)
+        
+        f_layout.addWidget(self.create_label("DATE MISSING"))
+        self.date_missing_input = QLineEdit()
+        self.date_missing_input.setPlaceholderText("e.g. 2026-03-12")
+        f_layout.addWidget(self.date_missing_input)
+
+        f_layout.addWidget(self.create_label("GUARDIAN CONTACT"))
+        self.contact_input = QLineEdit()
+        self.contact_input.setPlaceholderText("e.g. +1 555-0199")
+        f_layout.addWidget(self.contact_input)
         
         f_layout.addSpacing(10)
         
@@ -74,7 +79,7 @@ class RegisterView(QWidget):
         
         f_layout.addSpacing(20)
         
-        self.capture_btn = QPushButton("REGISTER EMPLOYEE")
+        self.capture_btn = QPushButton("REGISTER REPORT")
         self.capture_btn.setObjectName("PrimaryButton")
         self.capture_btn.setFixedHeight(50)
         self.capture_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -83,17 +88,23 @@ class RegisterView(QWidget):
         
         f_layout.addStretch()
         
-        # Right: Camera Preview
+        # Right: Image Preview & Upload
         preview_container = QFrame()
         preview_container.setStyleSheet(f"background-color: black; border: 2px solid {Theme.BORDER}; border-radius: 8px;")
         p_layout = QVBoxLayout(preview_container)
-        p_layout.setContentsMargins(2,2,2,2)
+        p_layout.setContentsMargins(10,10,10,10)
         
-        self.preview_label = QLabel("Waiting for Secure Stream...")
+        self.preview_label = QLabel("No Photo Selected")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_label.setStyleSheet("color: #64748b;")
+        self.preview_label.setStyleSheet("color: #64748b; font-size: 16px;")
         self.preview_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
-        p_layout.addWidget(self.preview_label)
+        p_layout.addWidget(self.preview_label, stretch=1)
+        
+        self.upload_btn = QPushButton("Select Photo")
+        self.upload_btn.setObjectName("SecondaryButton")
+        self.upload_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.upload_btn.clicked.connect(self.select_image)
+        p_layout.addWidget(self.upload_btn)
         
         # Instructions Overlay
         instr = QLabel("TIP: Ensure face is clearly visible without mask/glasses.")
@@ -107,47 +118,38 @@ class RegisterView(QWidget):
     def create_label(self, text):
         return QLabel(text, styleSheet=f"color: {Theme.PRIMARY}; font-weight: bold; font-size: 11px; margin-top: 5px;")
 
-    @pyqtSlot(np.ndarray, list)
-    def update_preview(self, frame, results):
-        try:
-            self.current_frame = frame.copy()
+    def select_image(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Image", "", "Images (*.png *.xpm *.jpg *.jpeg *.bmp)"
+        )
+        if file_path:
+            self.image_path = file_path
+            self.current_frame = cv2.imread(file_path)
             
-            # Draw Face Box for Feedback
-            for res in results:
-                x, y, w, h = res['rect']
-                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 255), 2)
-            
-            # Convert for preview
-            rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            h, w, ch = rgb_image.shape
-            bytes_per_line = ch * w
-            qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
-            
-            # Resize logic (Safe)
+            # Display image
+            pixmap = QPixmap(file_path)
             target_size = self.preview_label.size()
             if target_size.width() < 100: target_size = QSize(400, 300)
-
-            self.preview_label.setPixmap(QPixmap.fromImage(qt_image).scaled(
+            
+            self.preview_label.setPixmap(pixmap.scaled(
                 target_size, 
                 Qt.AspectRatioMode.KeepAspectRatio, 
-                Qt.TransformationMode.FastTransformation
+                Qt.TransformationMode.SmoothTransformation
             ))
-        finally:
-            self.render_finished.emit()
 
     def handle_registration(self):
-        # Validate Inputs
-        emp_id = self.id_input.text().strip()
         name = self.name_input.text().strip()
-        role = self.role_input.text().strip()
-        dept = self.dept_input.currentText()
+        age = self.age_input.text().strip()
+        last_seen = self.last_seen_input.text().strip()
+        date_missing = self.date_missing_input.text().strip()
+        contact = self.contact_input.text().strip()
         
-        if not name or not emp_id or not role:
-            QMessageBox.warning(self, "Validation Error", "All fields (ID, Name, Role) are required.")
+        if not name or not age or not contact:
+            QMessageBox.warning(self, "Validation Error", "Name, Age, and Contact are required.")
             return
             
         if self.current_frame is None:
-            QMessageBox.warning(self, "Hardware Error", "Webcam stream is not ready.")
+            QMessageBox.warning(self, "Validation Error", "Please upload a photo of the child.")
             return
 
         is_append = self.append_check.isChecked()
@@ -157,16 +159,21 @@ class RegisterView(QWidget):
         
         if success:
             # Save Metadata
-            self.emp_manager.add_employee(name, emp_id, role, dept)
+            self.child_manager.add_child(name, age, last_seen, date_missing, contact)
             
-            mode = "Enhanced" if is_append else "Created"
-            QMessageBox.information(self, "Success", f"Employee '{name}' (ID: {emp_id}) registered successfully.")
+            QMessageBox.information(self, "Success", f"Missing child '{name}' reported successfully. The face has been added to the neural database.")
             
             # Clear fields
-            self.id_input.clear()
             self.name_input.clear()
-            self.role_input.clear()
+            self.age_input.clear()
+            self.last_seen_input.clear()
+            self.date_missing_input.clear()
+            self.contact_input.clear()
             self.append_check.setChecked(False)
+            self.current_frame = None
+            self.image_path = None
+            self.preview_label.setText("No Photo Selected")
+            self.preview_label.setPixmap(QPixmap())
             
             self.user_registered.emit()
         else:

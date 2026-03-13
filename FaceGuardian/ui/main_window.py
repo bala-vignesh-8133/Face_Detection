@@ -99,8 +99,11 @@ class MainWindow(QMainWindow):
         
         # --- Connections ---
         self.monitor_view.render_finished.connect(self.camera_thread.set_render_finished)
-        self.register_view.render_finished.connect(self.camera_thread.set_render_finished)
+        # self.register_view.render_finished.connect(self.camera_thread.set_render_finished) # No longer live stream
         self.camera_thread.camera_changed.connect(self.monitor_view.update_camera_info)
+        
+        # System Event Routing (Monitor -> Alerts)
+        self.monitor_view.new_alert.connect(self.alerts_view.add_alert)
         
         self.register_view.user_registered.connect(self.database_view.refresh_list)
         self.database_view.database_changed.connect(self.engine.reload_known_faces)
@@ -139,12 +142,12 @@ class MainWindow(QMainWindow):
         self.nav_buttons = []
         # (Text, IconName, StackIndex)
         items = [
-            ("Dashboard", "fa5s.chart-line", 0),
-            ("Live Monitor", "fa5s.video", 1),
-            ("Neural Scanner", "fa5s.search", 6),
-            ("Add Employee", "fa5s.user-plus", 2),
-            ("Manage Employees", "fa5s.users", 3),
-            ("Security Alerts", "fa5s.bell", 4),
+            ("Commander Dashboard", "fa5s.chart-line", 0),
+            ("Live Surveillance", "fa5s.video", 1),
+            ("Verification Scanner", "fa5s.search", 6),
+            ("Report Missing Child", "fa5s.user-plus", 2),
+            ("Missing Children DB", "fa5s.database", 3),
+            ("Active Alerts", "fa5s.bell", 4),
             ("System Settings", "fa5s.cog", 5),
         ]
         
@@ -235,7 +238,7 @@ class MainWindow(QMainWindow):
         self.content_area.setCurrentIndex(index)
         
         # Update Titles
-        titles = ["Security Dashboard", "Live Surveillance", "Biometric Registration", "Authorized Personnel", "System Alerts"]
+        titles = ["Commander Dashboard", "Live Surveillance", "Report Missing Child", "Missing Children Database", "System Alerts"]
         if index < len(titles):
             self.page_title.setText(titles[index])
         
@@ -261,8 +264,6 @@ class MainWindow(QMainWindow):
 
         if index == 1: # Monitor
             self.camera_thread.frame_ready.connect(self.monitor_view.update_frame)
-        elif index == 2: # Register
-            self.camera_thread.frame_ready.connect(self.register_view.update_preview)
 
         # UNBLOCK: Reset the throttle flag
         self.camera_thread.reset_throttle()

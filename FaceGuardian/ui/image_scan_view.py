@@ -22,11 +22,11 @@ class ImageScanView(QWidget):
         layout.setSpacing(20)
         
         # Header
-        header = QLabel("Neural Image Scanner")
+        header = QLabel("Public Child Verification")
         header.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {Theme.TEXT_MAIN};")
         layout.addWidget(header)
         
-        sub = QLabel("Upload a static photo for instant biometric identification.")
+        sub = QLabel("Upload a static photo to instantly verify if a child is missing.")
         sub.setStyleSheet(f"color: {Theme.TEXT_SUB}; font-size: 14px;")
         layout.addWidget(sub)
         
@@ -85,24 +85,27 @@ class ImageScanView(QWidget):
             for face in faces:
                 x, y, w, h = map(int, face[:4])
                 name, confidence = self.engine.recognize(image, face)
-                authorized = name != "Unknown"
+                is_match = name != "Unknown"
                 
-                color = (0, 255, 0) if authorized else (0, 0, 255)
+                color = (0, 0, 255) if is_match else (0, 255, 0)
                 # Draw Box
                 cv2.rectangle(image, (x, y), (x+w, y+h), color, 2)
                 # Draw Label
-                lbl = f"{name} ({int(confidence*100)}%)"
+                lbl = f"MATCH: {name} ({int(confidence*100)}%)" if is_match else "Unknown"
                 cv2.putText(image, lbl, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
                 
-                results_text.append(f"{name} [{int(confidence*100)}%]")
+                if is_match:
+                    results_text.append(f"MATCH: {name} [{int(confidence*100)}%]")
         
         # 3. Display Result
         self.display_processed(image)
         
         if results_text:
-            self.results_label.setText(f"Analysis Complete: Found {len(results_text)} face(s) -> " + ", ".join(results_text))
+            self.results_label.setText(f"Analysis Complete: Found {len(results_text)} missing child match(es) -> " + ", ".join(results_text))
+            self.results_label.setStyleSheet(f"color: {Theme.DANGER}; font-weight: bold;")
         else:
-            self.results_label.setText("Analysis Complete: No faces detected.")
+            self.results_label.setText("Analysis Complete: No missing child records match.")
+            self.results_label.setStyleSheet(f"color: {Theme.ACCENT}; font-weight: bold;")
 
     def display_processed(self, frame):
         rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)

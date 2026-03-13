@@ -1,0 +1,34 @@
+{
+    "NagaPambu": {
+        "age": "9",
+        "last_seen_location": "RIT College Mess",
+        "date_missing": "2026-03-13",
+        "guardian_contact": "98989564",
+        "reported_on": "2026-03-13 12:42:52",
+        "status": "Missing"
+    },
+    "Nagarani": {
+        "age": "9",
+        "last_seen_location": "RIT Mess",
+        "date_missing": "2026-03-13",
+        "guardian_contact": "8956478565",
+        "reported_on": "2026-03-13 12:47:52",
+        "status": "Missing"
+    },
+    "NagaPambu 2": {
+        "age": "5",
+        "last_seen_location": "RIT CSBS Department",
+        "date_missing": "2026-03-13",
+        "guardian_contact": "8798456312",
+        "reported_on": "2026-03-13 12:49:09",
+        "status": "Missing"
+    },
+    "Nagini": {
+        "age": "8",
+        "last_seen_location": "RIT Toilet",
+        "date_missing": "2026-03-13",
+        "guardian_contact": "7895684898",
+        "reported_on": "2026-03-13 12:58:14",
+        "status": "Missing"
+    }
+}

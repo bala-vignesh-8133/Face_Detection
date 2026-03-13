@@ -99,8 +99,8 @@ class DashboardView(QWidget):
         
         user_count = len(self.engine.known_embeddings)
         
-        self.card_users = AnimatedStatCard("Authorized Personnel", user_count, "fa5s.users", Theme.PRIMARY)
-        self.card_alerts = AnimatedStatCard("Security Alerts", 23, "fa5s.bell", Theme.DANGER)
+        self.card_users = AnimatedStatCard("Active Missing Cases", user_count, "fa5s.search", Theme.DANGER)
+        self.card_alerts = AnimatedStatCard("Reported Sightings", 23, "fa5s.bell", Theme.WARNING)
         self.card_cameras = AnimatedStatCard("Active Cameras", 1, "fa5s.video", Theme.ACCENT)
         self.card_uptime = AnimatedStatCard("System Uptime", 99, "fa5s.clock", Theme.WARNING)
         
@@ -120,7 +120,7 @@ class DashboardView(QWidget):
         chart_card.setObjectName("Card")
         chart_layout = QVBoxLayout(chart_card)
         
-        chart_title = QLabel("Security Events - Last 7 Days")
+        chart_title = QLabel("System Lookups & Matches - Last 7 Days")
         chart_title.setStyleSheet(f"font-size: 16px; font-weight: 700; color: {Theme.TEXT_MAIN}; margin-bottom: 10px;")
         chart_layout.addWidget(chart_title)
         

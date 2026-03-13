@@ -98,28 +98,43 @@ class EmailNotifier:
             msg = MIMEMultipart()
             msg['From'] = self.sender_email
             msg['To'] = self.receiver_email
-            msg['Subject'] = "🚨 Unauthorized Person Detected - FaceGuardian Alert"
             
-            # Email body
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            body = f"""
-SECURITY ALERT - FaceGuardian System
 
-⚠️ Lab was Under Danger Zone ⚠️
+            if person_name and person_name != "Unknown":
+                msg['Subject'] = f"🚨 URGENT: Missing Child Sighting - {person_name} 🚨"
+                body = f"""
+MISSING CHILD DETECTION SYSTEM ALERT
+
+⚠️ POSSIBLE MATCH FOUND ⚠️
 
 Detection Details:
 - Time: {timestamp}
-- Person: {person_name}
-- Location: Lab Entrance
-- Status: Lab System was thefting
+- Identity: {person_name}
+- Location: Camera 0 (Main Entrance)
+- Status: Confirmed Neural Match
 
 Action Required:
-Immediatly come to ground floor lab sir....
+Please review the attached image immediately and contact the authorities.
 
 ---
-This is an automated alert from RIT ground floor security alert.
+This is an automated alert from FaceGuardian Missing Child System.
 Do not reply to this email.
-            """
+                """
+            else:
+                msg['Subject'] = "🚨 ALERT: System Activity Detected"
+                body = f"""
+MISSING CHILD DETECTION SYSTEM ALERT
+
+System Activity Details:
+- Time: {timestamp}
+- Location: Camera 0
+- Status: System Activity Logged
+
+---
+This is an automated alert from FaceGuardian Missing Child System.
+Do not reply to this email.
+                """
             
             msg.attach(MIMEText(body, 'plain'))
             
