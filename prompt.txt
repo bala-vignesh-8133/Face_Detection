@@ -1,0 +1,1406 @@
+Missing Child Detection System with AI Face Recognition
+PROJECT OVERVIEW
+A comprehensive web-based platform that enables citizens, police, and NGOs to report missing children and identify them through AI-powered face recognition technology. The system uses 128-dimensional face embeddings and Euclidean distance matching to find potential matches across the database.
+
+SYSTEM ARCHITECTURE
+High-Level Architecture
+text
+┌─────────────────────────────────────────────────────────────┐
+│                      CLIENT LAYER                            │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   Citizens   │  │    Police    │  │     NGOs     │      │
+│  │   Web App    │  │   Dashboard  │  │    Portal    │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      API GATEWAY                             │
+│              Load Balancer + Rate Limiting                   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    APPLICATION LAYER                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   Auth       │  │  Case Mgmt   │  │  Reporting   │      │
+│  │   Service    │  │   Service    │  │   Service    │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   Face AI    │  │  Notification│  │  Analytics   │      │
+│  │   Service    │  │   Service    │  │   Service    │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      DATA LAYER                               │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │  PostgreSQL  │  │    Redis     │  │    S3/Blob   │      │
+│  │   (Metadata) │  │   (Cache)    │  │   (Photos)   │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│  ┌──────────────┐  ┌──────────────┐                         │
+│  │   pgvector   │  │  Elastic     │                         │
+│  │  (Embeddings)│  │  Search      │                         │
+│  └──────────────┘  └──────────────┘                         │
+└─────────────────────────────────────────────────────────────┘
+CORE SYSTEM FLOWS
+Flow 1: Missing Child Registration
+Actors: Police, NGOs, Verified Guardians
+
+text
+┌─────────────────────────────────────────────────────────────────┐
+│                      REGISTRATION FLOW                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  [Start]                                                         │
+│     │                                                            │
+│     ▼                                                            │
+│  User Authentication & Verification                              │
+│     │                                                            │
+│     ▼                                                            │
+│  Fill Missing Child Details:                                     │
+│  ├─ Child Name, Age, Gender                                      │
+│  ├─ Last Seen Location (Map Picker)                              │
+│  ├─ Date & Time of Disappearance                                 │
+│  ├─ Physical Description & Clothing                              │
+│  ├─ Guardian/Contact Information                                 │
+│  └─ Police FIR Number (if available)                             │
+│     │                                                            │
+│     ▼                                                            │
+│  Upload Photos (Minimum 1, Max 5):                               │
+│  ├─ Photo Quality Check (Face Detection)                         │
+│  ├─ Auto-crop & Align Face                                       │
+│  └─ Preview & Confirm                                             │
+│     │                                                            │
+│     ▼                                                            │
+│  AI Processing:                                                  │
+│  ├─ Face Detection & Alignment                                   │
+│  ├─ Generate 128-Dimensional Face Embedding                      │
+│  └─ Store Embedding in Vector Database                           │
+│     │                                                            │
+│     ▼                                                            │
+│  Generate Case ID (Format: MISS-YYYYMMDD-XXXXX)                 │
+│     │                                                            │
+│     ▼                                                            │
+│  Notify Nearby Police Stations & Volunteers                      │
+│     │                                                            │
+│     ▼                                                            │
+│  [End]                                                           │
+│                                                                   │
+└─────────────────────────────────────────────────────────────────┘
+Flow 2: Face Search & Matching
+Actors: Citizens, Police, NGOs
+
+text
+┌─────────────────────────────────────────────────────────────────┐
+│                      FACE SEARCH FLOW                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  [Start]                                                         │
+│     │                                                            │
+│     ▼                                                            │
+│  User selects input method:                                      │
+│  ├─ Upload Photo from Device                                     │
+│  └─ Capture via Webcam                                           │
+│     │                                                            │
+│     ▼                                                            │
+│  Image Validation:                                               │
+│  ├─ Check image format & size (JPG/PNG, max 10MB)               │
+│  ├─ Detect single face in image                                  │
+│  ├─ Quality assessment (lighting, angle, clarity)               │
+│  └─ If invalid → show error & retry                              │
+│     │                                                            │
+│     ▼                                                            │
+│  AI Processing:                                                  │
+│  ├─ Extract face from image                                      │
+│  ├─ Generate 128D embedding vector                               │
+│  └─ Prepare for comparison                                       │
+│     │                                                            │
+│     ▼                                                            │
+│  Vector Search:                                                  │
+│  ├─ Calculate Euclidean Distance: d = ||v_query - v_known||₂    │
+│  ├─ Compare against all embeddings in database                   │
+│  ├─ Find top K matches (default: 5)                              │
+│  └─ Filter by confidence threshold (default: 0.6)               │
+│     │                                                            │
+│     ▼                                                            │
+│  Results Processing:                                             │
+│  ├─ If matches found:                                            │
+│  │   ├─ Sort by distance (lower = better match)                  │
+│  │   ├─ Calculate confidence % = (1 - distance) * 100            │
+│  │   └─ Prepare match details                                    │
+│  └─ If no matches:                                               │
+│      └─ Return "No Match Found" message                         │
+│     │                                                            │
+│     ▼                                                            │
+│  Display Results:                                                │
+│  ├─ Match cards with:                                            │
+│  │   ├─ Child Photo (blurred for public)                        │
+│  │   ├─ Name (partial for privacy)                              │
+│  │   ├─ Confidence Score                                         │
+│  │   ├─ Last Seen Location & Date                               │
+│  │   └─ "Contact Authorities" Button                            │
+│  └─ Option to report sighting if match found                    │
+│     │                                                            │
+│     ▼                                                            │
+│  [End]                                                           │
+│                                                                   │
+└─────────────────────────────────────────────────────────────────┘
+Flow 3: Sighting Reporting
+Actors: Citizens
+
+text
+┌─────────────────────────────────────────────────────────────────┐
+│                      SIGHTING REPORT FLOW                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  [Start]                                                         │
+│     │                                                            │
+│     ▼                                                            │
+│  User clicks "Report Sighting"                                   │
+│     │                                                            │
+│     ▼                                                            │
+│  Capture/Upload Photo of Child Seen                              │
+│     │                                                            │
+│     ▼                                                            │
+│  Auto-fill Location (GPS/Manual)                                │
+│     │                                                            │
+│     ▼                                                            │
+│  Add Details:                                                    │
+│  ├─ Date & Time of Sighting                                      │
+│  ├─ Description of Surroundings                                  │
+│  ├─ Child's Activity (walking, with someone, etc.)              │
+│  └─ Contact Info (optional)                                      │
+│     │                                                            │
+│     ▼                                                            │
+│  System performs face match (Flow 2)                             │
+│     │                                                            │
+│     ▼                                                            │
+│  If Match Found:                                                 │
+│  ├─ Notify assigned police station immediately                  │
+│  ├─ Send alert to child's guardian                              │
+│  ├─ Update case timeline                                         │
+│  └─ Show "Thank You" message with reference ID                  │
+│     │                                                            │
+│     ▼                                                            │
+│  If No Match:                                                    │
+│  ├─ Store sighting in database for future matching              │
+│  ├─ Add to "Unidentified" queue for review                      │
+│  └─ Show "Report Recorded" confirmation                         │
+│     │                                                            │
+│     ▼                                                            │
+│  [End]                                                           │
+│                                                                   │
+└─────────────────────────────────────────────────────────────────┘
+Flow 4: Case Management (Police)
+Actors: Police Officers, Investigators
+
+text
+┌─────────────────────────────────────────────────────────────────┐
+│                      CASE MANAGEMENT FLOW                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  [Start]                                                         │
+│     │                                                            │
+│     ▼                                                            │
+│  Police Officer Logs In                                          │
+│     │                                                            │
+│     ▼                                                            │
+│  Dashboard Shows:                                                │
+│  ├─ Active Cases (by jurisdiction)                              │
+│  ├─ New Matches (last 24h)                                      │
+│  ├─ Pending Verifications                                        │
+│  └─ Recent Sightings in Area                                     │
+│     │                                                            │
+│     ▼                                                            │
+│  Select Case to Manage:                                          │
+│  ├─ View Case Details                                            │
+│  ├─ Update Investigation Status                                  │
+│  ├─ Add Case Notes                                               │
+│  ├─ Upload Evidence                                              │
+│  └─ Assign Team Members                                          │
+│     │                                                            │
+│     ▼                                                            │
+│  Review Matches:                                                 │
+│  ├─ View all face matches for this case                         │
+│  ├─ Verify/Reject each match                                    │
+│  ├─ Contact reporting citizen                                   │
+│  └─ Dispatch field unit if needed                               │
+│     │                                                            │
+│     ▼                                                            │
+│  Coordinate Search:                                              │
+│  ├─ Broadcast alert to area                                     │
+│  ├─ Deploy resources (personnel, vehicles)                      │
+│  ├─ Track search progress on map                                │
+│  └─ Update family/guardian                                      │
+│     │                                                            │
+│     ▼                                                            │
+│  If Child Found:                                                 │
+│  ├─ Mark case as Resolved                                       │
+│  ├─ Record reunion details                                      │
+│  ├─ Close investigation                                         │
+│  └─ Send notification to all stakeholders                       │
+│     │                                                            │
+│     ▼                                                            │
+│  [End]                                                           │
+│                                                                   │
+└─────────────────────────────────────────────────────────────────┘
+Flow 5: Alert & Notification System
+Actors: All Users
+
+text
+┌─────────────────────────────────────────────────────────────────┐
+│                      NOTIFICATION FLOW                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  [Trigger Event]                                                 │
+│     │                                                            │
+│     ▼                                                            │
+│  Event Types:                                                    │
+│  ├─ New Missing Case (within 50km radius)                       │
+│  ├─ Match Found (for reported case)                             │
+│  ├─ Sighting Reported (near user location)                      │
+│  ├─ Case Resolved (success story)                               │
+│  └─ Amber Alert (critical/high priority)                        │
+│     │                                                            │
+│     ▼                                                            │
+│  Determine Recipients:                                           │
+│  ├─ Citizens: Based on location preferences                      │
+│  ├─ Police: Based on jurisdiction & assignment                  │
+│  ├─ NGOs: Based on operational area                             │
+│  └─ Guardians: For their own cases                              │
+│     │                                                            │
+│     ▼                                                            │
+│  Select Notification Channels:                                   │
+│  ├─ In-app Notification                                         │
+│  ├─ Email                                                        │
+│  ├─ SMS (for critical alerts)                                   │
+│  └─ Push Notification (web)                                     │
+│     │                                                            │
+│     ▼                                                            │
+│  Compose Message:                                                │
+│  ├─ Template-based with dynamic fields                          │
+│  ├─ Include: Case ID, Location, Photo (if permitted)           │
+│  ├─ Call-to-action buttons                                      │
+│  └─ Priority indicator                                          │
+│     │                                                            │
+│     ▼                                                            │
+│  Send Notifications                                             │
+│     │                                                            │
+│     ▼                                                            │
+│  Track Delivery & Response:                                      │
+│  ├─ Delivery status                                             │
+│  ├─ User actions (viewed, clicked)                              │
+│  └─ Response time metrics                                       │
+│     │                                                            │
+│     ▼                                                            │
+│  [End]                                                           │
+│                                                                   │
+└─────────────────────────────────────────────────────────────────┘
+AI FACE RECOGNITION PIPELINE
+Technical Specification
+text
+┌─────────────────────────────────────────────────────────────────┐
+│                    FACE RECOGNITION PIPELINE                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  Step 1: Face Detection                                          │
+│  ├── Input: W×H×3 RGB Image                                      │
+│  ├── Model: MTCNN / RetinaFace                                   │
+│  ├── Process:                                                    │
+│  │   ├─ Generate bounding boxes [x, y, width, height]           │
+│  │   ├─ Detect facial landmarks (eyes, nose, mouth)             │
+│  │   └─ Filter by confidence score > 0.95                       │
+│  └── Output: Cropped face region + landmarks                     │
+│                                                                   │
+│  Step 2: Face Alignment                                          │
+│  ├── Input: Cropped face + landmarks                             │
+│  ├── Process:                                                    │
+│  │   ├─ Apply affine transformation based on eye coordinates    │
+│  │   ├─ Rotate/scale to standard position                        │
+│  │   └─ Resize to 160×160 pixels                                 │
+│  └── Output: Aligned face image                                  │
+│                                                                   │
+│  Step 3: Feature Extraction                                      │
+│  ├── Input: 160×160×3 aligned face                               │
+│  ├── Model: FaceNet / ArcFace (Pre-trained on MS-Celeb-1M)      │
+│  ├── Architecture: Inception ResNet v1                           │
+│  ├── Process: Forward pass through network                       │
+│  └── Output: 128-dimensional embedding vector                    │
+│      Representation: [f₁, f₂, ..., f₁₂₈] where fᵢ ∈ ℝ            │
+│                                                                   │
+│  Step 4: Vector Normalization                                    │
+│  ├── Input: Raw 128D vector                                      │
+│  ├── Formula: v_norm = v / ||v||₂                                │
+│  ├── Process: L2 normalization                                   │
+│  └── Output: Unit vector (||v_norm||₂ = 1)                      │
+│                                                                   │
+│  Step 5: Similarity Computation                                  │
+│  ├── Input: Query vector q, Known vectors {k₁, k₂, ..., kₙ}     │
+│  ├── Distance Metric: Euclidean Distance                         │
+│  │    d(q, k) = √(Σ(qᵢ - kᵢ)²) for i = 1 to 128                 │
+│  ├── Alternative: Cosine Similarity                              │
+│  │    cos(θ) = (q·k) / (||q||₂ × ||k||₂)                        │
+│  └── Output: Distance/Similarity scores                          │
+│                                                                   │
+│  Step 6: Matching Decision                                       │
+│  ├── Find: min_distance = min(d(q, kᵢ) for all known)           │
+│  ├── Threshold: τ = 0.6 (configurable)                          │
+│  ├── Decision:                                                   │
+│  │   ├── if min_distance < τ → Match found                      │
+│  │   └── else → No match                                         │
+│  └── Confidence: conf = (1 - min_distance) × 100%                │
+│                                                                   │
+└─────────────────────────────────────────────────────────────────┘
+Mathematical Foundation
+text
+Face Recognition as Metric Learning:
+
+Goal: Learn function f: Image → ℝ¹²⁸ such that:
+    d(f(x₁), f(x₂)) < δ  if x₁, x₂ are same person
+    d(f(x₁), f(x₂)) > δ  if x₁, x₂ are different persons
+
+Triplet Loss Function:
+    L = max(0, d(a, p) - d(a, n) + margin)
+    where:
+        a = anchor image
+        p = positive (same person)
+        n = negative (different person)
+        margin = 0.2 (typical)
+
+Euclidean Distance Properties:
+    • Non-negative: d(x,y) ≥ 0
+    • Identity: d(x,y) = 0 iff x = y
+    • Symmetric: d(x,y) = d(y,x)
+    • Triangle inequality: d(x,z) ≤ d(x,y) + d(y,z)
+
+Threshold Optimization:
+    True Positive Rate = TP / (TP + FN)
+    False Positive Rate = FP / (FP + TN)
+    Optimal τ at Equal Error Rate (EER)
+DATABASE SCHEMA
+Core Tables
+sql
+-- Users Table
+CREATE TABLE users (
+    user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    phone VARCHAR(15) UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL CHECK (role IN ('citizen', 'police', 'ngo', 'admin')),
+    organization VARCHAR(255),
+    designation VARCHAR(100),
+    is_verified BOOLEAN DEFAULT false,
+    verification_document VARCHAR(500),
+    last_login TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_role (role),
+    INDEX idx_verified (is_verified)
+);
+
+-- Missing Children Table
+CREATE TABLE missing_children (
+    case_id VARCHAR(50) PRIMARY KEY,
+    child_name VARCHAR(255) NOT NULL,
+    age INT,
+    date_of_birth DATE,
+    gender VARCHAR(10) CHECK (gender IN ('Male', 'Female', 'Other')),
+    father_name VARCHAR(255),
+    mother_name VARCHAR(255),
+    photo_urls JSON NOT NULL, -- Array of photo URLs
+    face_embedding VECTOR(128), -- pgvector extension
+    last_seen_location GEOGRAPHY(POINT),
+    last_seen_address TEXT,
+    last_seen_city VARCHAR(100),
+    last_seen_state VARCHAR(100),
+    last_seen_pincode VARCHAR(10),
+    last_seen_date DATE NOT NULL,
+    last_seen_time TIME,
+    clothing_description TEXT,
+    distinguishing_features TEXT,
+    medical_conditions TEXT,
+    reporter_id UUID REFERENCES users(user_id),
+    reporter_type VARCHAR(50) CHECK (reporter_type IN ('guardian', 'police', 'ngo')),
+    guardian_name VARCHAR(255),
+    guardian_contact VARCHAR(15),
+    guardian_email VARCHAR(255),
+    police_station VARCHAR(255),
+    fir_number VARCHAR(50),
+    investigating_officer_id UUID REFERENCES users(user_id),
+    case_status VARCHAR(20) DEFAULT 'active' 
+        CHECK (case_status IN ('active', 'under_investigation', 'resolved', 'closed')),
+    priority VARCHAR(10) DEFAULT 'medium'
+        CHECK (priority IN ('critical', 'high', 'medium', 'low')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_date TIMESTAMP,
+    resolved_notes TEXT,
+    INDEX idx_status (case_status),
+    INDEX idx_date (last_seen_date),
+    INDEX idx_city (last_seen_city),
+    INDEX idx_reporter (reporter_id)
+);
+
+-- Sightings Table
+CREATE TABLE sightings (
+    sighting_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    case_id VARCHAR(50) REFERENCES missing_children(case_id),
+    reporter_name VARCHAR(255),
+    reporter_phone VARCHAR(15),
+    reporter_email VARCHAR(255),
+    is_anonymous BOOLEAN DEFAULT false,
+    photo_url VARCHAR(500),
+    face_embedding VECTOR(128),
+    sighting_location GEOGRAPHY(POINT),
+    sighting_address TEXT,
+    sighting_city VARCHAR(100),
+    sighting_date TIMESTAMP NOT NULL,
+    description TEXT,
+    match_confidence DECIMAL(5,2),
+    match_verified BOOLEAN DEFAULT false,
+    verified_by UUID REFERENCES users(user_id),
+    verified_date TIMESTAMP,
+    alert_sent BOOLEAN DEFAULT false,
+    status VARCHAR(20) DEFAULT 'pending'
+        CHECK (status IN ('pending', 'verified', 'false_alarm', 'actioned')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_case (case_id),
+    INDEX idx_status (status),
+    INDEX idx_date (sighting_date)
+);
+
+-- Face Matches Table
+CREATE TABLE face_matches (
+    match_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    query_image_id VARCHAR(255),
+    query_embedding VECTOR(128),
+    matched_case_id VARCHAR(50) REFERENCES missing_children(case_id),
+    distance DECIMAL(10,8) NOT NULL,
+    confidence DECIMAL(5,2) GENERATED ALWAYS AS ((1 - distance) * 100) STORED,
+    threshold_used DECIMAL(3,2) DEFAULT 0.6,
+    search_type VARCHAR(20) CHECK (search_type IN ('public', 'police', 'cctv')),
+    user_id UUID REFERENCES users(user_id),
+    ip_address INET,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_match (matched_case_id),
+    INDEX idx_distance (distance)
+);
+
+-- Notifications Table
+CREATE TABLE notifications (
+    notification_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(user_id),
+    type VARCHAR(50) CHECK (type IN ('new_case', 'match_found', 'sighting', 'case_resolved', 'amber_alert')),
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    data JSON, -- Additional metadata
+    is_read BOOLEAN DEFAULT false,
+    read_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user (user_id),
+    INDEX idx_read (is_read)
+);
+
+-- Audit Logs Table
+CREATE TABLE audit_logs (
+    log_id BIGSERIAL PRIMARY KEY,
+    user_id UUID REFERENCES users(user_id),
+    action VARCHAR(100) NOT NULL,
+    entity_type VARCHAR(50),
+    entity_id VARCHAR(100),
+    old_data JSON,
+    new_data JSON,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user (user_id),
+    INDEX idx_entity (entity_type, entity_id),
+    INDEX idx_time (created_at)
+);
+Vector Search Optimization
+sql
+-- Create IVFFlat index for approximate nearest neighbor search
+CREATE INDEX idx_face_embedding ON missing_children 
+USING ivfflat (face_embedding vector_l2_ops)
+WITH (lists = 100);
+
+-- Or use HNSW for better accuracy (PostgreSQL with pgvector 0.5.0+)
+CREATE INDEX idx_face_embedding_hnsw ON missing_children 
+USING hnsw (face_embedding vector_l2_ops);
+
+-- Query for nearest neighbors
+SELECT 
+    case_id,
+    child_name,
+    face_embedding <-> $1 AS distance,
+    (1 - (face_embedding <-> $1)) * 100 AS confidence
+FROM missing_children
+WHERE case_status = 'active'
+ORDER BY face_embedding <-> $1
+LIMIT 5;
+API ENDPOINTS
+Authentication Endpoints
+text
+POST   /api/auth/register           - User registration
+POST   /api/auth/login              - User login
+POST   /api/auth/verify-email       - Email verification
+POST   /api/auth/forgot-password    - Password reset request
+POST   /api/auth/reset-password      - Reset password
+POST   /api/auth/refresh-token       - Refresh JWT
+GET    /api/auth/me                  - Get current user
+PUT    /api/auth/me                  - Update profile
+Public Endpoints
+text
+GET    /api/public/stats             - Get system statistics
+GET    /api/public/missing/recent     - Get recent missing cases (limited)
+GET    /api/public/success-stories    - Get resolved cases
+POST   /api/public/face/scan          - Upload and scan face
+POST   /api/public/sighting/report    - Report a sighting
+GET    /api/public/safety-tips        - Get safety resources
+Case Management Endpoints
+text
+POST   /api/cases                     - Create new missing child case
+GET    /api/cases                     - List cases (paginated, filterable)
+GET    /api/cases/:caseId              - Get case details
+PUT    /api/cases/:caseId              - Update case
+DELETE /api/cases/:caseId              - Close/delete case
+GET    /api/cases/:caseId/timeline     - Get case timeline
+POST   /api/cases/:caseId/notes        - Add case note
+GET    /api/cases/:caseId/matches      - Get face matches for case
+POST   /api/cases/:caseId/verify-match - Verify a match
+Face Recognition Endpoints
+text
+POST   /api/face/detect                - Detect faces in image
+POST   /api/face/encode                 - Generate face embedding
+POST   /api/face/search                 - Search by face (advanced)
+POST   /api/face/batch-search           - Batch face search
+GET    /api/face/status/:jobId          - Check batch job status
+GET    /api/face/thresholds              - Get matching thresholds
+PUT    /api/face/thresholds              - Update thresholds (admin)
+Sighting Endpoints
+text
+GET    /api/sightings                   - List sightings
+GET    /api/sightings/:sightingId       - Get sighting details
+PUT    /api/sightings/:sightingId/verify - Verify sighting
+DELETE /api/sightings/:sightingId       - Delete sighting
+GET    /api/sightings/nearby             - Get sightings near location
+POST   /api/sightings/:sightingId/alert  - Send alert for sighting
+Police/Investigation Endpoints
+text
+GET    /api/police/dashboard             - Police dashboard data
+GET    /api/police/cases/assigned        - Get assigned cases
+POST   /api/police/cases/:caseId/assign  - Assign officer
+POST   /api/police/cases/:caseId/priority - Update priority
+GET    /api/police/statistics             - Investigation statistics
+POST   /api/police/broadcast              - Broadcast alert
+GET    /api/police/team                    - Get team members
+POST   /api/police/team/assign             - Assign to case
+Admin Endpoints
+text
+GET    /api/admin/users                   - List users
+PUT    /api/admin/users/:userId/verify    - Verify user
+DELETE /api/admin/users/:userId            - Suspend/delete user
+GET    /api/admin/analytics                - System analytics
+GET    /api/admin/audit-logs               - View audit logs
+POST   /api/admin/settings                  - Update system settings
+GET    /api/admin/performance               - Performance metrics
+POST   /api/admin/backup                     - Trigger backup
+TECHNOLOGY STACK
+Frontend
+text
+Framework: Next.js 14 (React) with TypeScript
+State Management: Redux Toolkit + RTK Query
+UI Components: Headless UI + Tailwind CSS
+Forms: React Hook Form + Zod validation
+HTTP Client: Axios with interceptors
+Maps: Leaflet + OpenStreetMap
+Charts: Recharts for analytics
+PWA: Next.js PWA plugin
+Testing: Jest + React Testing Library
+Build Tool: Webpack 5 / Turbopack
+Backend
+text
+API Framework: Node.js + Express / Python FastAPI
+Language: TypeScript / Python 3.10+
+Authentication: JWT (RS256) + HTTP-only cookies
+Validation: Joi / Pydantic
+Rate Limiting: express-rate-limit / slowapi
+File Upload: Multer / python-multipart
+Image Processing: Sharp / OpenCV
+Documentation: Swagger UI / ReDoc
+WebSocket: Socket.io for real-time
+Task Queue: Bull (Redis) / Celery
+AI/ML Services
+text
+Face Detection: MTCNN, RetinaFace
+Face Recognition: FaceNet, ArcFace (128D embeddings)
+Model Format: ONNX, TensorFlow SavedModel
+Inference Server: TensorFlow Serving, TorchServe
+Vector Database: pgvector, Pinecone, Qdrant
+GPU Acceleration: CUDA 11.x, cuDNN 8.x
+Model Training: PyTorch / TensorFlow
+Version Control: DVC for models
+Monitoring: MLflow, Prometheus
+Database & Storage
+text
+Primary Database: PostgreSQL 15+
+Vector Extension: pgvector 0.5+
+Caching: Redis 7+ (for sessions, rate limiting)
+Search Engine: Elasticsearch 8+ (optional)
+File Storage: AWS S3 / MinIO / Local filesystem
+Backup: pg_dump, WAL archiving
+Connection Pool: PgBouncer
+Migration: Flyway / Alembic
+DevOps & Infrastructure
+text
+Container: Docker + Docker Compose
+Orchestration: Kubernetes (for production)
+CI/CD: GitHub Actions / GitLab CI
+Cloud: AWS (EC2, RDS, S3) / DigitalOcean
+Monitoring: Prometheus + Grafana
+Logging: ELK Stack / Loki + Promtail
+APM: New Relic / Sentry
+CDN: Cloudflare / AWS CloudFront
+Load Balancer: Nginx / HAProxy
+SSL: Let's Encrypt / Cert-Manager
+DEPLOYMENT ARCHITECTURE
+Development Environment
+text
+┌─────────────────────────────────────────┐
+│           Local Development              │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐ │
+│  │ Next.js │  │ Node.js │  │PostgreSQL│ │
+│  │  (Port 3000) (Port 5000) (Port 5432)│ │
+│  └─────────┘  └─────────┘  └─────────┘ │
+│  ┌─────────┐  ┌─────────┐               │
+│  │  Redis  │  │  MinIO  │               │
+│  │(Port 6379) (Port 9000)│               │
+│  └─────────┘  └─────────┘               │
+└─────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────┐
+│         Docker Compose                   │
+│  All services containerized              │
+└─────────────────────────────────────────┘
+Production Environment (AWS)
+text
+┌─────────────────────────────────────────────────────┐
+│                  CloudFront (CDN)                     │
+└─────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────┐
+│              Application Load Balancer               │
+└─────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────┐
+│              ECS / Kubernetes Cluster                │
+│  ┌──────────────┐  ┌──────────────┐                 │
+│  │ Next.js      │  │ Next.js      │  Auto-scaling   │
+│  │ Container 1  │  │ Container 2  │  (3-10 replicas)│
+│  └──────────────┘  └──────────────┘                 │
+│  ┌──────────────┐  ┌──────────────┐                 │
+│  │ Node.js API  │  │ Node.js API  │  Auto-scaling   │
+│  │ Container 1  │  │ Container 2  │  (5-20 replicas)│
+│  └──────────────┘  └──────────────┘                 │
+│  ┌──────────────┐  ┌──────────────┐                 │
+│  │  AI Service  │  │  AI Service  │  GPU instances  │
+│  │ Container 1  │  │ Container 2  │  (2-5 replicas) │
+│  └──────────────┘  └──────────────┘                 │
+└─────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────┐
+│                    Data Layer                         │
+│  ┌──────────────┐  ┌──────────────┐                 │
+│  │  RDS         │  │  ElastiCache │  Managed        │
+│  │  PostgreSQL  │  │  Redis       │  Services       │
+│  │  Multi-AZ    │  │  Cluster     │                 │
+│  └──────────────┘  └──────────────┘                 │
+│  ┌──────────────┐  ┌──────────────┐                 │
+│  │  S3 Bucket   │  │  OpenSearch  │  Optional       │
+│  │  (Photos)    │  │  (Search)    │                 │
+│  └──────────────┘  └──────────────┘                 │
+└─────────────────────────────────────────────────────┘
+SECURITY IMPLEMENTATION
+Authentication & Authorization
+javascript
+// JWT Token Structure
+{
+  "header": {
+    "alg": "RS256",
+    "typ": "JWT"
+  },
+  "payload": {
+    "sub": "user_id",
+    "role": "police",
+    "permissions": ["read:cases", "write:cases", "verify:matches"],
+    "district": "chennai",
+    "iat": 1516239022,
+    "exp": 1516242622
+  }
+}
+
+// Role-Based Access Control (RBAC)
+const roles = {
+  citizen: {
+    permissions: [
+      'public:scan',
+      'public:report-sighting',
+      'public:view-basic-cases'
+    ]
+  },
+  police: {
+    permissions: [
+      'cases:create',
+      'cases:read:*',
+      'cases:update:assigned',
+      'matches:verify',
+      'alerts:send'
+    ]
+  },
+  admin: {
+    permissions: ['*']
+  }
+};
+Data Encryption
+javascript
+// At Rest Encryption
+- Database: Transparent Data Encryption (TDE)
+- File Storage: Server-side encryption (AES-256)
+- Sensitive Fields: Column-level encryption
+  - Aadhaar numbers
+  - Phone numbers
+  - Email addresses
+  - Guardian details
+
+// In Transit
+- TLS 1.3 for all external communications
+- mTLS for service-to-service communication
+- API Gateway with WAF
+- HSTS headers enabled
+Rate Limiting
+javascript
+// Rate Limit Configuration
+{
+  public: {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // 100 requests per IP
+    message: "Too many requests, please try again later"
+  },
+  authenticated: {
+    windowMs: 15 * 60 * 1000,
+    max: 500,
+    message: "Rate limit exceeded"
+  },
+  police: {
+    windowMs: 15 * 60 * 1000,
+    max: 2000,
+    message: "Rate limit exceeded"
+  },
+  faceScan: {
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 50, // 50 scans per hour
+    message: "Scan limit reached"
+  }
+}
+Audit Logging
+javascript
+// Audit Log Entry Structure
+{
+  "log_id": "unique-id",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "user": {
+    "id": "user-123",
+    "role": "police",
+    "ip": "192.168.1.100",
+    "user_agent": "Mozilla/5.0..."
+  },
+  "action": "CASE_UPDATE",
+  "resource": {
+    "type": "missing_child",
+    "id": "MISS-20240115-00123"
+  },
+  "changes": {
+    "status": {
+      "old": "active",
+      "new": "under_investigation"
+    },
+    "assigned_officer": {
+      "old": null,
+      "new": "OFFICER-456"
+    }
+  },
+  "result": "success"
+}
+PERFORMANCE OPTIMIZATION
+Image Optimization Pipeline
+javascript
+// Image Processing Steps
+1. Validate format (JPEG, PNG)
+2. Check dimensions (min 300×300)
+3. Detect face (if no face → reject)
+4. Generate multiple sizes:
+   - Thumbnail: 150×150 (for lists)
+   - Preview: 600×600 (for details)
+   - Original: max 1200×1200 (for processing)
+5. Compress (quality: 85%, format: WebP)
+6. Store with CDN-friendly naming
+7. Generate blurhash for lazy loading
+Database Query Optimization
+sql
+-- Use indexes for frequent queries
+CREATE INDEX CONCURRENTLY idx_cases_status_date 
+ON missing_children(case_status, last_seen_date DESC);
+
+-- Partial indexes for active cases
+CREATE INDEX CONCURRENTLY idx_active_cases 
+ON missing_children(last_seen_date DESC) 
+WHERE case_status = 'active';
+
+-- Covering indexes for common queries
+CREATE INDEX CONCURRENTLY idx_cases_list 
+ON missing_children(case_status, created_at) 
+INCLUDE (child_name, last_seen_city);
+
+-- Partition large tables by date
+CREATE TABLE sightings_2024 PARTITION OF sightings
+FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');
+Caching Strategy
+javascript
+// Redis Cache Keys
+- `user:{id}:profile` - User profile (TTL: 1 hour)
+- `case:{id}:details` - Case details (TTL: 5 minutes)
+- `stats:daily` - Daily statistics (TTL: 1 hour)
+- `embeddings:recent` - Recent embeddings (TTL: 10 minutes)
+- `rate:scan:{ip}` - Rate limit counters (TTL: window)
+
+// Cache Invalidation
+- On case update → delete case:{id}:details
+- On new sighting → delete stats:daily
+- On user update → delete user:{id}:profile
+ERROR HANDLING
+API Error Response Format
+javascript
+{
+  "success": false,
+  "error": {
+    "code": "FACE_NOT_DETECTED",
+    "message": "No face detected in the uploaded image",
+    "details": {
+      "image_size": "1024x768",
+      "detection_confidence": 0.12,
+      "suggestion": "Please upload a clear photo with a visible face"
+    },
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req-123456"
+  }
+}
+Common Error Codes
+text
+AUTH_001: Invalid credentials
+AUTH_002: Token expired
+AUTH_003: Insufficient permissions
+
+FACE_001: No face detected
+FACE_002: Multiple faces detected
+FACE_003: Image quality too low
+FACE_004: Face too small
+FACE_005: Invalid image format
+
+CASE_001: Case not found
+CASE_002: Case already closed
+CASE_003: Invalid case data
+
+SIGHTING_001: Invalid location
+SIGHTING_002: Duplicate report
+
+SYSTEM_001: Service unavailable
+SYSTEM_002: Rate limit exceeded
+SYSTEM_003: Maintenance mode
+TESTING STRATEGY
+Unit Tests
+javascript
+// Face Recognition Tests
+describe('Face Recognition', () => {
+  test('should generate 128D embedding', () => {
+    const embedding = generateEmbedding(testImage);
+    expect(embedding).toHaveLength(128);
+    expect(embedding).toBeInstanceOf(Float32Array);
+  });
+
+  test('should match same person with distance < 0.6', () => {
+    const emb1 = generateEmbedding(personA_1);
+    const emb2 = generateEmbedding(personA_2);
+    const distance = euclideanDistance(emb1, emb2);
+    expect(distance).toBeLessThan(0.6);
+  });
+
+  test('should not match different people', () => {
+    const emb1 = generateEmbedding(personA);
+    const emb2 = generateEmbedding(personB);
+    const distance = euclideanDistance(emb1, emb2);
+    expect(distance).toBeGreaterThan(0.6);
+  });
+});
+Integration Tests
+javascript
+// API Integration Tests
+describe('POST /api/public/face/scan', () => {
+  test('should return matches for known face', async () => {
+    const response = await request(app)
+      .post('/api/public/face/scan')
+      .attach('photo', 'test/fixtures/known-person.jpg');
+    
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.matches).toBeInstanceOf(Array);
+    expect(response.body.matches[0]).toHaveProperty('confidence');
+    expect(response.body.matches[0].confidence).toBeGreaterThan(85);
+  });
+
+  test('should return no matches for unknown face', async () => {
+    const response = await request(app)
+      .post('/api/public/face/scan')
+      .attach('photo', 'test/fixtures/unknown-person.jpg');
+    
+    expect(response.status).toBe(200);
+    expect(response.body.matches).toHaveLength(0);
+    expect(response.body.message).toContain('No match found');
+  });
+});
+Load Tests
+javascript
+// K6 Load Test Script
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+
+export const options = {
+  stages: [
+    { duration: '1m', target: 50 },  // Ramp up to 50 users
+    { duration: '3m', target: 50 },  // Stay at 50 users
+    { duration: '1m', target: 100 }, // Ramp to 100 users
+    { duration: '3m', target: 100 }, // Stay at 100 users
+    { duration: '1m', target: 0 },   // Ramp down
+  ],
+  thresholds: {
+    http_req_duration: ['p(95)<500'], // 95% of requests < 500ms
+    http_req_failed: ['rate<0.01'],   // < 1% failure rate
+  },
+};
+
+export default function() {
+  const payload = {
+    // Test data
+  };
+  
+  const res = http.post('http://localhost:5000/api/public/face/scan', payload);
+  
+  check(res, {
+    'status is 200': (r) => r.status === 200,
+    'response time < 500ms': (r) => r.timings.duration < 500,
+  });
+  
+  sleep(1);
+}
+MONITORING & OBSERVABILITY
+Metrics to Track
+yaml
+System Metrics:
+  - CPU usage per service
+  - Memory usage
+  - Disk I/O
+  - Network traffic
+  - Database connections
+
+Business Metrics:
+  - Daily active users
+  - Cases registered (by district)
+  - Face scans performed
+  - Matches found
+  - Sightings reported
+  - Average match time
+  - Success rate (resolved/active)
+
+Performance Metrics:
+  - API response time (p50, p95, p99)
+  - Face recognition latency
+  - Database query time
+  - Cache hit ratio
+  - Error rate by endpoint
+
+Security Metrics:
+  - Failed login attempts
+  - Unauthorized access attempts
+  - Rate limit violations
+  - Suspicious IPs detected
+Monitoring Dashboard (Grafana)
+text
+┌─────────────────────────────────────────────────────┐
+│              SYSTEM OVERVIEW                         │
+├──────────────┬──────────────┬──────────────┬────────┤
+│ Active Users │ Cases Today  │ Scans Today  │ Matches│
+│    1,234     │      45      │    2,890     │   12   │
+├──────────────┴──────────────┴──────────────┴────────┤
+│                                                      │
+│  API Response Time (p95)                             │
+│  ┌────────────────────────────────────────────────┐ │
+│  │                                                │ │
+│  │        ███                                      │ │
+│  │     ███████                                     │ │
+│  │  ███████████                                    │ │
+│  └────────────────────────────────────────────────┘ │
+│    12:00   13:00   14:00   15:00   16:00            │
+│                                                      │
+│  Face Recognition Latency                           │
+│  ┌────────────────────────────────────────────────┐ │
+│  │                                                │ │
+│  │           ██                                     │ │
+│  │        ██████                                    │ │
+│  │     ██████████                                   │ │
+│  └────────────────────────────────────────────────┘ │
+│     Avg: 187ms                                      │
+└─────────────────────────────────────────────────────┘
+Alerting Rules
+yaml
+Critical Alerts (PagerDuty):
+  - API error rate > 5% for 5 minutes
+  - Face recognition service down
+  - Database connection pool exhausted
+  - Disk space < 10%
+
+Warning Alerts (Email/Slack):
+  - Response time > 1s for 10 minutes
+  - CPU usage > 80% for 15 minutes
+  - Failed login attempts spike
+  - Cache hit ratio < 50%
+
+Info Alerts (Dashboard):
+  - New district added
+  - Model retraining completed
+  - Backup completed/ failed
+  - New user role created
+DATA PRIVACY & COMPLIANCE
+Data Retention Policy
+yaml
+Active Cases:
+  - Retain until resolved + 7 years (legal requirement)
+  - Archive after 7 years
+  - Delete after 10 years (with legal approval)
+
+Resolved Cases:
+  - Keep for 5 years for research/analytics
+  - Anonymize after 2 years (remove PII)
+  - Delete embeddings after 5 years
+
+Sightings:
+  - Unmatched sightings: 30 days
+  - Matched sightings: 5 years
+  - Anonymous reports: 7 days
+
+User Data:
+  - Active users: Until account deletion
+  - Inactive accounts (>2 years): Archive
+  - Deleted accounts: 30 days grace period, then permanent delete
+Privacy Controls
+javascript
+// Data Anonymization
+const anonymizeData = (userData) => {
+  return {
+    ...userData,
+    name: hash(userData.name + salt),
+    phone: maskPhone(userData.phone),
+    email: hash(userData.email + salt),
+    location: roundCoordinates(userData.location, 0.01), // ~1km precision
+    exact_dob: null,
+    age_range: calculateAgeRange(userData.dob)
+  };
+};
+
+// Consent Management
+const consentTypes = {
+  data_collection: {
+    required: true,
+    description: "Collect necessary data for missing child search"
+  },
+  location_tracking: {
+    required: false,
+    description: "Share location for nearby alerts"
+  },
+  notifications: {
+    required: false,
+    description: "Receive push notifications"
+  },
+  data_sharing: {
+    required: false,
+    description: "Share anonymized data for research"
+  }
+};
+SCALABILITY CONSIDERATIONS
+Horizontal Scaling Strategy
+yaml
+API Layer:
+  - Stateless design (JWT tokens)
+  - Session stored in Redis
+  - Auto-scaling based on CPU/RAM
+  - Target: 50% utilization for headroom
+
+Database Layer:
+  - Read replicas for queries
+  - Write master with sync replication
+  - Sharding by district/region
+  - Connection pooling (PgBouncer)
+
+Vector Search:
+  - Partition embeddings by region
+  - ANN indexes for approximate search
+  - GPU instances for batch processing
+  - Cache frequent queries
+
+File Storage:
+  - CDN for photo delivery
+  - S3 with lifecycle policies
+  - Image optimization on upload
+  - Progressive loading
+Capacity Planning
+yaml
+Year 1 Estimates:
+  - Users: 100,000
+  - Cases: 5,000
+  - Face scans: 500,000/month
+  - Photos: 50,000
+  - Storage: 100GB
+  - API requests: 1M/month
+
+Year 3 Estimates:
+  - Users: 500,000
+  - Cases: 25,000
+  - Face scans: 2.5M/month
+  - Photos: 250,000
+  - Storage: 500GB
+  - API requests: 5M/month
+
+Year 5 Estimates:
+  - Users: 2M
+  - Cases: 100,000
+  - Face scans: 10M/month
+  - Photos: 1M
+  - Storage: 2TB
+  - API requests: 20M/month
+DISASTER RECOVERY
+Backup Strategy
+yaml
+Database Backups:
+  - Full backup: Daily at 2 AM
+  - Incremental: Every 6 hours
+  - WAL archiving: Continuous
+  - Retention: 30 days
+  - Testing: Monthly restore test
+
+File Backups:
+  - S3 cross-region replication
+  - Versioning enabled
+  - Lifecycle rules for old versions
+  - Glacier for long-term archive
+
+Configuration:
+  - Infrastructure as Code (Terraform)
+  - Config versioned in Git
+  - Secrets in Vault
+  - Environment variables documented
+Recovery Procedures
+yaml
+Scenario 1: Database Failure
+  - Auto-failover to replica (RTO: 5 min)
+  - Promote read replica to master
+  - Update connection strings
+  - Verify data consistency
+
+Scenario 2: Region Outage
+  - Route traffic to secondary region
+  - DNS update (TTL: 5 min)
+  - Activate cross-region replicas
+  - Monitor application health
+
+Scenario 3: Data Corruption
+  - Stop write operations
+  - Restore from last good backup
+  - Replay WAL logs to point-in-time
+  - Verify data integrity
+  - Resume operations
+
+RTO: 4 hours
+RPO: 15 minutes
+USER ROLES & PERMISSIONS MATRIX
+Feature	Citizen	Police	NGO	Admin
+View public cases	✅	✅	✅	✅
+Face scan (public)	✅	✅	✅	✅
+Report sighting	✅	✅	✅	✅
+Report missing child	✅ (verify)	✅	✅ (verify)	✅
+View full case details	❌	✅ (assigned)	✅ (assigned)	✅
+Update case status	❌	✅	❌	✅
+Verify matches	❌	✅	❌	✅
+Send alerts	❌	✅	❌	✅
+Access analytics	❌	✅ (limited)	✅ (limited)	✅
+Manage users	❌	❌	❌	✅
+System configuration	❌	❌	❌	✅
+View audit logs	❌	❌	❌	✅
+INTEGRATION POINTS
+External Systems
+yaml
+Police Systems:
+  - FIR database (read-only)
+  - Criminal records (restricted)
+  - Vehicle registration (search support)
+  - Missing person databases (state/national)
+
+Government Databases:
+  - Aadhaar (verification only)
+  - Voter ID (demographics)
+  - School enrollment records
+  - Hospital records (for found children)
+
+NGO Networks:
+  - Childline (1098) integration
+  - Shelter databases
+  - Rehabilitation centers
+  - Counseling services
+
+Public Services:
+  - Railway stations (CCTV feed)
+  - Bus terminals (CCTV feed)
+  - Airport security
+  - Port authorities
+API Integration Examples
+javascript
+// Police FIR System Integration
+GET /api/external/police/fir/{fir_number}
+Headers: {
+  'Authorization': 'Bearer ' + police_api_key,
+  'X-District-Code': 'CHENNAI'
+}
+Response: {
+  fir_number: string,
+  date_registered: date,
+  police_station: string,
+  investigating_officer: string,
+  status: string,
+  details: object
+}
+
+// Aadhaar Verification (masked)
+POST /api/external/uidai/verify
+Body: {
+  aadhaar_number: "XXXX-XXXX-XXXX", // last 4 digits only
+  name: string,
+  consent: true,
+  purpose: "missing_child_verification"
+}
+Response: {
+  verified: boolean,
+  age_band: string,
+  gender: string,
+  state: string
+}
+SUCCESS METRICS & KPIs
+Technical KPIs
+text
+System Uptime: 99.9% (monthly)
+API Response Time (p95): < 500ms
+Face Recognition Accuracy: > 98%
+False Positive Rate: < 2%
+Face Scan Success Rate: > 95%
+Database Query Time (p95): < 100ms
+Cache Hit Ratio: > 80%
+Error Rate: < 1%
+Business KPIs
+text
+Monthly Active Users: 50,000+
+Cases Registered: 500/month
+Face Scans: 100,000/month
+Matches Found: 50/month
+Sightings Reported: 200/month
+Cases Resolved: 40/month
+Average Resolution Time: < 7 days
+Citizen Satisfaction: > 4.5/5
+Police Adoption Rate: 100% of stations
+Impact Metrics
+text
+Children Reunited: 500+/year
+Families Reached: 1,000+/year
+Police Efficiency Gain: 30% faster
+Community Participation: 100,000+ volunteers
+Public Awareness: 1M+ reached
+Cost Savings: ₹2Cr+ (vs manual)
+Lives Impacted: 5,000+ annually
+PHASED IMPLEMENTATION ROADMAP
+Phase 1: MVP (3 months)
+text
+Core Features:
+  ✅ User registration/login
+  ✅ Report missing child
+  ✅ Basic face upload
+  ✅ Simple search (no AI)
+  ✅ Public case listing
+  ✅ Admin panel
+
+Technology:
+  - Single server deployment
+  - Basic PostgreSQL
+  - Simple file storage
+  - No AI (manual matching)
+Phase 2: AI Integration (3 months)
+text
+New Features:
+  ✅ Face detection
+  ✅ Embedding generation
+  ✅ Vector search
+  ✅ Match confidence scores
+  ✅ Sighting reporting
+  ✅ Email notifications
+
+Technology:
+  - AI service integration
+  - pgvector for embeddings
+  - Redis caching
+  - Background jobs
+Phase 3: Police Portal (3 months)
+text
+New Features:
+  ✅ Police dashboard
+  ✅ Case management
+  ✅ Match verification
+  ✅ Alert broadcasting
+  ✅ Investigation tools
+  ✅ Team coordination
+
+Technology:
+  - Role-based access
+  - Real-time updates
+  - Audit logging
+  - Advanced analytics
+Phase 4: Scale & Optimize (3 months)
+text
+New Features:
+  ✅ CCTV integration
+  ✅ Mobile app (PWA)
+  ✅ Offline support
+  ✅ Multi-language
+  ✅ Advanced analytics
+  ✅ Performance optimization
+
+Technology:
+  - Microservices
+  - Kubernetes
+  - CDN integration
+  - Auto-scaling
+  - Multi-region deployment
+This professional prompt provides complete technical architecture, API specifications, database design, AI pipeline details, and implementation roadmap for building a production-ready missing child detection system with face recognition.
+
+This response is AI-generated, for reference only.
