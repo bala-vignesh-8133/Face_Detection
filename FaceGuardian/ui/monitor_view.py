@@ -4,9 +4,10 @@ import os
 import time
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QGridLayout, QSizePolicy
 from PyQt6.QtGui import QImage, QPixmap
-from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QDateTime
+from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QDateTime, QSize
 from ui.styles import Theme
 import qtawesome as qta
+from core.email_notifier import EmailNotifier
 
 class MonitorView(QWidget):
     # Signal to tell camera thread we are ready for next frame
@@ -19,6 +20,9 @@ class MonitorView(QWidget):
         self.alerts_dir = "alerts"
         if not os.path.exists(self.alerts_dir):
             os.makedirs(self.alerts_dir)
+        
+        # Initialize email notifier
+        self.email_notifier = EmailNotifier()
             
         self.init_ui()
 
@@ -120,32 +124,25 @@ class MonitorView(QWidget):
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
             # Draw bounding boxes on frame
-            for res in results:
-                x, y, w, h = res['rect']
-                name = res['name']
-                accuracy = res['distance']
-                authorized = res['authorized']
+            for result in results:
+                x, y, w, h = result['rect']
+                name = result['name']
+                distance = result['distance']
+                authorized = result['authorized']
                 
-                # Determine state and color
                 if authorized:
-                    color = (0, 255, 0) # Green
-                    display_name = name.upper()
-                    self.update_panel(name, accuracy, True)
-                    detected_target = True
+                    color = (0, 255, 0)  # Green for authorized
+                    display_label = f"{name} [{int(distance*100)}%]"
+                    status_text = "AUTHORIZED"
+                    status_color = Theme.ACCENT
                 else:
-                    color = (0, 0, 255) # Red
-                    display_name = "UNAUTHORIZED"
-                    
-                    if name == "Unknown":
-                        self.update_panel("UNKNOWN", accuracy, False)
-                        detected_target = True
-                        
-                        # INTRUDER CAPTURE LOGIC
-                        current_time = time.time()
-                        if current_time - self.last_capture_time > 5.0: # 5 Second Cooldown
-                            self.capture_intruder(frame, x, y, w, h)
-                            self.last_capture_time = current_time
+                    color = (0, 0, 255)  # Red for unauthorized
+                    display_label = f"{name}"
+                    status_text = "UNAUTHORIZED"
+                    status_color = Theme.DANGER
                 
+                detected_target = True
+
                 # Draw sleek corner brackets (Cyber Style)
                 length = int(w * 0.25)
                 thickness = 2
@@ -167,13 +164,22 @@ class MonitorView(QWidget):
                 cv2.line(frame, (x + w, y + h), (x + w, y + h - length), color, thickness)
 
                 # Floating Label
-                conf_percent = int(accuracy * 100)
-                label = f"{display_name} [{conf_percent}%]"
+                label = display_label
                 
                 # Label Background
                 cv2.rectangle(frame, (x, y - 25), (x + int(w*0.8), y-5), color, cv2.FILLED)
                 cv2.putText(frame, label, (x + 5, y - 12), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,0,0), 1, cv2.LINE_AA)
+                
+                # Update info panel
+                self.update_panel(name, distance, status_text, status_color)
+                
+                # Capture unauthorized faces with 60-second cooldown
+                if not authorized:
+                    current_time = time.time()
+                    if current_time - self.last_capture_time > 60:  # 1 minute cooldown
+                        self.capture_intruder(frame.copy(), x, y, w, h, name)
+                        self.last_capture_time = current_time
             
             if not detected_target:
                 self.lbl_status.setText("SCANNING...")
@@ -201,27 +207,37 @@ class MonitorView(QWidget):
         finally:
             self.render_finished.emit()
 
-    def update_panel(self, name, conf, authorized):
+    def update_panel(self, name, conf, status_text, status_color):
+        """Update info panel with identity information"""
         self.lbl_name.setText(name)
         self.lbl_conf.setText(f"{int(conf*100)}%")
         self.lbl_time.setText(QDateTime.currentDateTime().toString("HH:mm:ss"))
-        
-        if authorized:
-            self.lbl_status.setText("AUTHORIZED")
-            self.lbl_status.setStyleSheet(f"color: {Theme.ACCENT}; font-size: 16px; font-weight: 800;")
-        else:
-            self.lbl_status.setText("UNAUTHORIZED")
-            self.lbl_status.setStyleSheet(f"color: {Theme.DANGER}; font-size: 16px; font-weight: 800;")
+        self.lbl_status.setText(status_text)
+        self.lbl_status.setStyleSheet(f"color: {status_color}; font-size: 16px; font-weight: 800;")
 
     @pyqtSlot(str)
     def update_camera_info(self, name):
         self.lbl_camera.setText(name.upper())
 
-    def capture_intruder(self, frame, x, y, w, h):
+    def capture_intruder(self, frame, x, y, w, h, name):
+        """Capture unauthorized person with red bounding box drawn on image"""
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         filename = f"intruder_{timestamp}.jpg"
         filepath = os.path.join(self.alerts_dir, filename)
         
-        # Save full frame
+        # Draw RED bounding box on the frame
+        color = (0, 0, 255)  # Red in BGR
+        cv2.rectangle(frame, (x, y), (x+w, y+h), color, 3)
+        
+        # Draw label with name
+        label = f"UNAUTHORIZED: {name}"
+        label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+        cv2.rectangle(frame, (x, y-30), (x + label_size[0] + 10, y), color, -1)
+        cv2.putText(frame, label, (x + 5, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        
+        # Save frame with bounding box
         cv2.imwrite(filepath, frame)
-        print(f"Intruder Detected! Saved to {filepath}")
+        print(f"[ALERT] Intruder Captured! Saved to {filepath}")
+        
+        # Send email alert in background (non-blocking)
+        self.email_notifier.send_alert(filepath, name)

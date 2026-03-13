@@ -19,6 +19,8 @@ from ui.login_dialog import LoginDialog
 from ui.settings_view import SettingsView
 from ui.image_scan_view import ImageScanView
 from ui.styles import Theme
+from ui.components.toast import show_toast
+from ui.components.badge import NotificationBadge
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -32,8 +34,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("FaceGuardian Pro | Admin Security Console")
         self.resize(1280, 800)
         
-        # Apply Global Theme
-        self.setStyleSheet(Theme.GLOBAL_STYLES)
+        # Theme Management
+        self.setStyleSheet(Theme.get_stylesheet())
         
         # Initialize Core Systems
         self.engine = FaceRecognitionEngine()
@@ -206,10 +208,11 @@ class MainWindow(QMainWindow):
         
         layout.addSpacing(20)
         
-        # Time
         self.time_label = QLabel()
         self.time_label.setStyleSheet(f"color: {Theme.TEXT_SUB}; font-weight: 600;")
         layout.addWidget(self.time_label)
+        
+        layout.addSpacing(15)
         
         # Admin Icon
         admin = QLabel("👤 Admin")
@@ -261,6 +264,9 @@ class MainWindow(QMainWindow):
         elif index == 2: # Register
             self.camera_thread.frame_ready.connect(self.register_view.update_preview)
 
+        # UNBLOCK: Reset the throttle flag
+        self.camera_thread.reset_throttle()
+    
         # UNBLOCK: Reset the throttle flag
         self.camera_thread.reset_throttle()
 

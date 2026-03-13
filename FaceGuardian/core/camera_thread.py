@@ -74,8 +74,9 @@ class CameraThread(QThread):
             frame = cv2.flip(frame, 1)
             self.frame_count += 1
             
-            # OPTIMIZATION: Process AI only every 3rd frame
-            if self.frame_count % 3 == 0:
+            # OPTIMIZATION: Process AI only every 5th frame (for 1080p on CPU)
+            # This reduces CPU load by 40% while maintaining good detection
+            if self.frame_count % 5 == 0:
                 try:
                     faces = self.engine.detect_faces(frame)
                 except Exception as e:
@@ -86,6 +87,7 @@ class CameraThread(QThread):
                 if faces is not None:
                     for face in faces:
                         x, y, w, h = map(int, face[:4])
+                        
                         try:
                             name, confidence = self.engine.recognize(frame, face)
                         except:
@@ -120,9 +122,15 @@ class CameraThread(QThread):
             self.cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
             if not self.cap.isOpened():
                 self.cap = cv2.VideoCapture(self.camera_index)
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            
+            # Full HD 1080p - Maximum quality for professional monitoring
+            # GPU acceleration handles the processing load
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce latency
+            
+            # Set FPS to 30 for smooth video
+            self.cap.set(cv2.CAP_PROP_FPS, 30)
         else:
             # Video File
             self.cap = cv2.VideoCapture(self.camera_index)
