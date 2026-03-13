@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton,
-    QFrame, QGraphicsDropShadowEffect
+    QFrame, QGraphicsDropShadowEffect, QComboBox
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
@@ -55,7 +55,8 @@ class LoginDialog(QDialog):
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.showFullScreen()
         self.setStyleSheet("background-color: #05070d;")
-
+        
+        self.role = None  # To store the authenticated role
         self.init_ui()
 
     def init_ui(self):
@@ -152,9 +153,40 @@ class LoginDialog(QDialog):
 
         layout.addSpacing(25)
 
+        # ===== Role Selection =====
+        self.role_combo = QComboBox()
+        self.role_combo.addItems(["Volunteer", "Police Officer", "Government Admin"])
+        self.role_combo.setFixedHeight(46)
+        self.role_combo.setStyleSheet("""
+            QComboBox {
+                background-color: rgba(10, 14, 25, 0.85);
+                border: 1px solid #1f3b4d;
+                border-radius: 12px;
+                padding-left: 14px;
+                font-size: 13px;
+                color: #e5f9ff;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #0a0e19;
+                color: #e5f9ff;
+                selection-background-color: rgba(0, 246, 255, 0.2);
+                selection-color: #00f6ff;
+                border: 1px solid #1f3b4d;
+                outline: none;
+            }
+            QComboBox QAbstractItemView::item {
+                min-height: 35px;
+                padding-left: 10px;
+            }
+        """)
+        layout.addWidget(self.role_combo)
+
         # ===== Username =====
         self.user_input = QLineEdit()
-        self.user_input.setPlaceholderText("Admin ID")
+        self.user_input.setPlaceholderText("Agent/User ID")
         self.user_input.setFixedHeight(46)
         self.user_input.setStyleSheet(self.input_style())
         layout.addWidget(self.user_input)
@@ -236,10 +268,23 @@ class LoginDialog(QDialog):
     def handle_login(self):
         user = self.user_input.text()
         pwd = self.pass_input.text()
+        selected_role = self.role_combo.currentText()
 
-        if user == "admin" and pwd == "admin":
+        # Simple Hardcoded RBAC Authentication
+        authenticated = False
+        
+        if selected_role == "Volunteer" and user == "volunteer" and pwd == "volunteer":
+            self.role = "Volunteer"
+            authenticated = True
+        elif selected_role == "Police Officer" and user == "police" and pwd == "police":
+            self.role = "Police"
+            authenticated = True
+        elif selected_role == "Government Admin" and (user == "gov" or user == "admin") and (pwd == "gov" or pwd == "admin"):
+            self.role = "Government"
+            authenticated = True
+
+        if authenticated:
             self.accept()
         else:
-            dlg = DarkMessageBox("ACCESS DENIED", "Invalid credentials.", self)
+            dlg = DarkMessageBox("ACCESS DENIED", "Invalid credentials for selected role.", self)
             dlg.exec()
-            self.pass_input.clear()

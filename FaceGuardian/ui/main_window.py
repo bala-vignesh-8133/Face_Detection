@@ -26,10 +26,12 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         
-        # 0. AUTHENTICATION (Strict Admin Only)
+        # 0. AUTHENTICATION (RBAC)
         login = LoginDialog()
         if login.exec() != QDialog.DialogCode.Accepted:
             sys.exit(0)
+            
+        self.role = login.role
             
         self.setWindowTitle("FaceGuardian Pro | Admin Security Console")
         self.resize(1280, 800)
@@ -108,8 +110,9 @@ class MainWindow(QMainWindow):
         self.register_view.user_registered.connect(self.database_view.refresh_list)
         self.database_view.database_changed.connect(self.engine.reload_known_faces)
         
-        # Start at Dashboard
-        self.switch_view(0)
+        # Start at first available tab for the role
+        first_available_index = self.nav_buttons[0].target_index if self.nav_buttons else 0
+        self.switch_view(first_available_index)
 
     def create_sidebar(self):
         self.sidebar = QFrame()
@@ -138,28 +141,30 @@ class MainWindow(QMainWindow):
         layout.addWidget(logo_box)
         layout.addSpacing(20)
         
-        # Navigation
+        # Navigation Restrictions
         self.nav_buttons = []
-        # (Text, IconName, StackIndex)
-        items = [
-            ("Commander Dashboard", "fa5s.chart-line", 0),
-            ("Live Surveillance", "fa5s.video", 1),
-            ("Verification Scanner", "fa5s.search", 6),
-            ("Report Missing Child", "fa5s.user-plus", 2),
-            ("Missing Children DB", "fa5s.database", 3),
-            ("Active Alerts", "fa5s.bell", 4),
-            ("System Settings", "fa5s.cog", 5),
+        # (Text, IconName, StackIndex, AllowedRoles)
+        all_items = [
+            ("Commander Dashboard", "fa5s.chart-line", 0, ["Police", "Government"]),
+            ("Live Surveillance", "fa5s.video", 1, ["Police"]),
+            ("Verification Scanner", "fa5s.search", 6, ["Volunteer", "Police", "Government"]),
+            ("Report Missing Child", "fa5s.user-plus", 2, ["Volunteer", "Police", "Government"]),
+            ("Missing Children DB", "fa5s.database", 3, ["Police", "Government"]),
+            ("Active Alerts", "fa5s.bell", 4, ["Police", "Government"]),
+            ("System Settings", "fa5s.cog", 5, ["Government"]),
         ]
         
-        for text, icon, idx in items:
-            btn = self.create_nav_btn(text, icon, idx)
-            layout.addWidget(btn)
+        for text, icon, idx, allowed_roles in all_items:
+            if self.role in allowed_roles:
+                btn = self.create_nav_btn(text, icon, idx)
+                layout.addWidget(btn)
             
         layout.addStretch()
         
         # Bottom Info
-        version = QLabel("Admin Access Only")
-        version.setStyleSheet(f"color: {Theme.DANGER}; padding: 20px; font-size: 11px; font-weight: bold;")
+        version = QLabel(f"Role: {self.role.upper()}")
+        role_color = Theme.PRIMARY if self.role == "Volunteer" else (Theme.WARNING if self.role == "Police" else Theme.DANGER)
+        version.setStyleSheet(f"color: {role_color}; padding: 20px; font-size: 11px; font-weight: bold;")
         version.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(version)
 
@@ -217,8 +222,8 @@ class MainWindow(QMainWindow):
         
         layout.addSpacing(15)
         
-        # Admin Icon
-        admin = QLabel("👤 Admin")
+        # Admin Icon (Dynamic based on role)
+        admin = QLabel(f"👤 {self.role}")
         admin.setStyleSheet(f"font-weight: bold; padding-left: 20px; border-left: 1px solid {Theme.BORDER};")
         layout.addWidget(admin)
         
