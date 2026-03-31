@@ -1,9 +1,9 @@
 import cv2
 import mediapipe as mp
+# Import solutions directly to avoid "no attribute 'solutions'" error on some platforms
+import mediapipe.python.solutions.face_mesh as mp_face_mesh
 import numpy as np
 import os
-
-mp_face_mesh = mp.solutions.face_mesh
 
 # Define key landmark indices for MediaPipe
 LEFT_EYE = 33

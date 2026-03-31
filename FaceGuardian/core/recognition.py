@@ -92,7 +92,8 @@ class FaceRecognitionEngine:
             
         for filename in os.listdir(self.known_faces_dir):
             if filename.endswith(".dat"):
-                name = filename.split("_")[0]
+                # Strip extension and potential timestamp suffix
+                name = filename.replace(".dat", "").split("_")[0]
                 
                 # Check Approval Status BEFORE Loading into RAM
                 child_record = self.child_db.get_child(name)

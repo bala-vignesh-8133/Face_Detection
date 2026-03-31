@@ -16,6 +16,7 @@ class Theme:
         'PRIMARY_DARK': '#00B8D9',
         'SECONDARY': '#6366F1',
         'ACCENT': '#10B981',
+        'SUCCESS': '#10B981',
         'DANGER': '#FF3B5C',
         'WARNING': '#FFAA00',
         'TEXT_MAIN': '#FFFFFF',
@@ -33,6 +34,7 @@ class Theme:
     PRIMARY = DARK['PRIMARY']
     SECONDARY = DARK['SECONDARY']
     ACCENT = DARK['ACCENT']
+    SUCCESS = DARK['SUCCESS']
     DANGER = DARK['DANGER']
     WARNING = DARK['WARNING']
     TEXT_MAIN = DARK['TEXT_MAIN']

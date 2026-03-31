@@ -3,7 +3,7 @@ import sys
 import qtawesome as qta
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, 
-    QStackedWidget, QLabel, QFrame, QDialog
+    QStackedWidget, QLabel, QFrame, QDialog, QComboBox
 )
 from PyQt6.QtCore import Qt, QTimer, QSize, QDateTime
 from PyQt6.QtGui import QIcon
@@ -21,6 +21,7 @@ from ui.image_scan_view import ImageScanView
 from ui.styles import Theme
 from ui.components.toast import show_toast
 from ui.components.badge import NotificationBadge
+from core.translator import Translator as T
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -162,7 +163,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         
         # Bottom Info
-        version = QLabel(f"Role: {self.role.upper()}")
+        version = QLabel(f"{T.tr('Role')}: {self.role.upper()}")
         role_color = Theme.PRIMARY if self.role == "Volunteer" else (Theme.WARNING if self.role == "Police" else Theme.DANGER)
         version.setStyleSheet(f"color: {role_color}; padding: 20px; font-size: 11px; font-weight: bold;")
         version.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -222,6 +223,16 @@ class MainWindow(QMainWindow):
         
         layout.addSpacing(15)
         
+        # Language Selector
+        self.lang_selector = QComboBox()
+        self.lang_selector.addItems([T.LANG_EN, T.LANG_TA])
+        self.lang_selector.setCurrentText(T.get_language())
+        self.lang_selector.setFixedWidth(100)
+        self.lang_selector.currentTextChanged.connect(self.change_language)
+        layout.addWidget(self.lang_selector)
+        
+        layout.addSpacing(15)
+
         # Admin Icon (Dynamic based on role)
         admin = QLabel(f"👤 {self.role}")
         admin.setStyleSheet(f"font-weight: bold; padding-left: 20px; border-left: 1px solid {Theme.BORDER};")
@@ -230,9 +241,9 @@ class MainWindow(QMainWindow):
         layout.addSpacing(15)
         
         # Logout Button
-        logout_btn = QPushButton(" Logout")
-        logout_btn.setIcon(qta.icon("fa5s.sign-out-alt", color=Theme.DANGER))
-        logout_btn.setStyleSheet(f"""
+        self.logout_btn = QPushButton(f"  {T.tr('Logout')}")
+        self.logout_btn.setIcon(qta.icon("fa5s.sign-out-alt", color=Theme.DANGER))
+        self.logout_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: transparent;
                 color: {Theme.DANGER};
@@ -245,18 +256,50 @@ class MainWindow(QMainWindow):
                 background-color: rgba(255, 77, 77, 0.1);
             }}
         """)
-        logout_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        logout_btn.clicked.connect(self.logout_user)
-        layout.addWidget(logout_btn)
+        self.logout_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.logout_btn.clicked.connect(self.logout_user)
+        layout.addWidget(self.logout_btn)
         
         self.right_layout.addWidget(self.topbar)
         
-        # Timer for clock
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_time)
-        self.timer.start(1000)
         self.update_time()
 
+    def change_language(self, lang):
+        T.set_language(lang)
+        self.retranslate_ui()
+
+    def retranslate_ui(self):
+        # 1. Update Sidebar Buttons
+        # Note: In a real app we'd map labels, here we'll just clear and recreate for speed
+        # or just update the text of existing buttons if we had their keys.
+        # Let's just re-set the text of the nav buttons.
+        all_items = [
+            ("Commander Dashboard", 0),
+            ("Live Surveillance", 1),
+            ("Verification Scanner", 6),
+            ("Report Missing Child", 2),
+            ("Missing Children DB", 3),
+            ("Active Alerts", 4),
+            ("System Settings", 5),
+        ]
+        
+        # Map indices to translated names
+        translation_map = {idx: name for name, idx in all_items}
+        
+        for btn in self.nav_buttons:
+            if hasattr(btn, 'target_index') and btn.target_index in translation_map:
+                key = translation_map[btn.target_index]
+                btn.setText(f"  {T.tr(key)}")
+
+        # 2. Update Top Bar Titles & Buttons
+        self.logout_btn.setText(f"  {T.tr('Logout')}")
+        self.switch_view(self.content_area.currentIndex()) # Refreshes page title
+        
+        # 3. Refresh Views (Optionally tell them to re-translate)
+        if hasattr(self.register_view, 'retranslate_ui'): self.register_view.retranslate_ui()
+        if hasattr(self.image_scan_view, 'retranslate_ui'): self.image_scan_view.retranslate_ui()
+        if hasattr(self.database_view, 'retranslate_ui'): self.database_view.retranslate_ui()
+        
     def logout_user(self):
         # Stop the camera thread
         self.camera_thread.stop()
@@ -276,9 +319,21 @@ class MainWindow(QMainWindow):
         self.content_area.setCurrentIndex(index)
         
         # Update Titles
-        titles = ["Commander Dashboard", "Live Surveillance", "Report Missing Child", "Missing Children Database", "System Alerts"]
-        if index < len(titles):
-            self.page_title.setText(titles[index])
+        titles_keys = ["Commander Dashboard", "Live Surveillance", "Report Missing Child", "Missing Children DB", "Active Alerts", "System Settings", "Verification Scanner"]
+        # We need to find the title for the active index
+        all_items = [
+            ("Commander Dashboard", 0),
+            ("Live Surveillance", 1),
+            ("Report Missing Child", 2),
+            ("Missing Children DB", 3),
+            ("Active Alerts", 4),
+            ("System Settings", 5),
+            ("Verification Scanner", 6),
+        ]
+        title_map = {idx: key for key, idx in all_items}
+        
+        if index in title_map:
+            self.page_title.setText(T.tr(title_map[index]))
         
         # Active State Styling
         for btn in self.nav_buttons:

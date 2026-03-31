@@ -5,6 +5,7 @@ from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from ui.styles import Theme
 from core.child_manager import ChildManager
+from core.translator import Translator as T
 
 class DatabaseView(QWidget):
     """
@@ -29,7 +30,7 @@ class DatabaseView(QWidget):
         layout.setContentsMargins(30, 30, 30, 30)
         
         # Header
-        header = QLabel("Missing Children Database")
+        header = QLabel(T.tr("Missing Children DB"))
         header.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {Theme.TEXT_MAIN};")
         layout.addWidget(header)
         
@@ -60,8 +61,9 @@ class DatabaseView(QWidget):
         if not os.path.exists(self.engine.known_faces_dir):
             os.makedirs(self.engine.known_faces_dir)
 
-        # Get all users (sorted)
-        users = sorted(self.engine.known_embeddings.keys())
+        # Get all children from the database instead of just active embeddings
+        all_children = self.child_manager.get_all_children()
+        users = sorted(all_children.keys())
         
         for name in users:
             item = QListWidgetItem(self.user_list)
@@ -79,15 +81,15 @@ class DatabaseView(QWidget):
             container.setStyleSheet(f"""
                 QFrame {{
                     background-color: {Theme.SURFACE}; 
-                    border-radius: 10px; 
+                    border-radius: 8px; 
                     border: 1px solid {Theme.BORDER};
                 }}
             """)
-            container.setMinimumHeight(90)
+            container.setMinimumHeight(70)
             
             layout = QHBoxLayout(container)
-            layout.setContentsMargins(15, 12, 15, 12)
-            layout.setSpacing(20)
+            layout.setContentsMargins(12, 8, 12, 8)
+            layout.setSpacing(15)
             
             # Thumbnail
             thumb_label = QLabel()
@@ -106,7 +108,7 @@ class DatabaseView(QWidget):
                 thumb_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 thumb_label.setStyleSheet(f"background-color: {Theme.SURFACE_HOVER}; border-radius: 30px; font-size: 24px;")
             
-            thumb_label.setFixedSize(60, 60)
+            thumb_label.setFixedSize(50, 50)
             layout.addWidget(thumb_label)
             
             # Info Block
@@ -114,15 +116,15 @@ class DatabaseView(QWidget):
             info_layout.setSpacing(2)
             
             name_label = QLabel(name.upper())
-            name_label.setStyleSheet(f"font-weight: 800; color: {Theme.TEXT_MAIN}; font-size: 16px; border: none; background: transparent;")
+            name_label.setStyleSheet(f"font-weight: 800; color: {Theme.TEXT_MAIN}; font-size: 14px; border: none; background: transparent;")
             info_layout.addWidget(name_label)
             
             details = QLabel(f"Age: {age}  |  Last Seen: {location}  |  Missing Since: {date_missing}\nAadhar: {aadhar}  |  Status: {status.upper()}")
             
             if status == "Active":
-                details.setStyleSheet(f"color: {Theme.PRIMARY}; font-size: 12px; font-weight: bold; border: none; background: transparent;")
+                details.setStyleSheet(f"color: {Theme.PRIMARY}; font-size: 11px; font-weight: bold; border: none; background: transparent;")
             else:
-                details.setStyleSheet(f"color: {Theme.WARNING}; font-size: 12px; font-weight: bold; border: none; background: transparent;")
+                details.setStyleSheet(f"color: {Theme.WARNING}; font-size: 11px; font-weight: bold; border: none; background: transparent;")
                 
             info_layout.addWidget(details)
             
@@ -135,16 +137,17 @@ class DatabaseView(QWidget):
             # 1. Approve Button (Only visible if Pending and user is Police/Admin)
             role = self.window().role if hasattr(self.window(), 'role') else "Volunteer"
             if status != "Active" and role in ["Police", "Government"]:
-                approve_btn = QPushButton("Approve Case")
+                approve_btn = QPushButton(T.tr("Approve Case"))
                 approve_btn.setFixedWidth(140)
                 approve_btn.setCursor(Qt.CursorShape.PointingHandCursor)
                 approve_btn.setStyleSheet(f"""
                     QPushButton {{
                         background-color: {Theme.SUCCESS};
                         color: #ffffff;
-                        border-radius: 6px;
+                        border-radius: 4px;
                         font-weight: bold;
-                        padding: 8px;
+                        padding: 5px;
+                        font-size: 11px;
                     }}
                     QPushButton:hover {{ background-color: #2fb56e; }}
                 """)
@@ -152,9 +155,10 @@ class DatabaseView(QWidget):
                 action_layout.addWidget(approve_btn)
 
             # 2. Delete button
-            del_btn = QPushButton("Close Case")
+            del_btn = QPushButton(T.tr("Close Case"))
             del_btn.setObjectName("SecondaryButton")
-            del_btn.setFixedWidth(140)
+            del_btn.setFixedWidth(120)
+            del_btn.setStyleSheet("font-size: 11px; padding: 5px;")
             del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             del_btn.clicked.connect(lambda checked, n=name: self.delete_user(n))
             action_layout.addWidget(del_btn)
@@ -167,6 +171,9 @@ class DatabaseView(QWidget):
             self.user_list.setItemWidget(item, container)
             
         self.stats_label.setText(f"Total Active Cases: {len(users)}")
+
+    def retranslate_ui(self):
+        self.refresh_list()
 
     def approve_user(self, name):
         reply = QMessageBox.question(self, 'Confirm Approval', 

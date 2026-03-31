@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayo
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtCore import Qt, QSize
 from ui.styles import Theme
+from core.translator import Translator as T
 
 class ImageScanView(QWidget):
     """
@@ -22,19 +23,13 @@ class ImageScanView(QWidget):
         layout.setSpacing(20)
         
         # Header
-        header = QLabel("Public Child Verification")
-        header.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {Theme.TEXT_MAIN};")
-        layout.addWidget(header)
-        
-        sub = QLabel("Upload a static photo to instantly verify if a child is missing.")
-        sub.setStyleSheet(f"color: {Theme.TEXT_SUB}; font-size: 14px;")
-        layout.addWidget(sub)
-        
-        layout.addSpacing(10)
+        self.header = QLabel(T.tr("Verification Scanner"))
+        self.header.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {Theme.TEXT_MAIN};")
+        layout.addWidget(self.header)
         
         # Action Bar
         actions = QHBoxLayout()
-        self.upload_btn = QPushButton("UPLOAD PHOTO")
+        self.upload_btn = QPushButton(T.tr("UPLOAD PHOTO"))
         self.upload_btn.setObjectName("PrimaryButton")
         self.upload_btn.setFixedHeight(45)
         self.upload_btn.setFixedWidth(200)
@@ -62,6 +57,10 @@ class ImageScanView(QWidget):
         self.results_label = QLabel("Ready for analysis...")
         self.results_label.setStyleSheet(f"color: {Theme.ACCENT}; font-weight: bold;")
         layout.addWidget(self.results_label)
+
+    def retranslate_ui(self):
+        self.header.setText(T.tr("Verification Scanner"))
+        self.upload_btn.setText(T.tr("UPLOAD PHOTO"))
 
     def select_image(self):
         file_path, _ = QFileDialog.getOpenFileName(

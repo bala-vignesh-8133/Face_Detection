@@ -8,6 +8,7 @@ from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QDateTime, QSize
 from ui.styles import Theme
 import qtawesome as qta
 from core.email_notifier import EmailNotifier
+from core.translator import Translator as T
 
 class MonitorView(QWidget):
     # Signal to tell camera thread we are ready for next frame
@@ -59,10 +60,10 @@ class MonitorView(QWidget):
         ip_layout.setSpacing(15)
         
         # Header
-        header = QLabel("TARGET ANALYSIS")
-        header.setStyleSheet(f"color: {Theme.PRIMARY}; font-weight: 900; letter-spacing: 2px; font-size: 14px;")
-        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        ip_layout.addWidget(header)
+        self.header = QLabel(T.tr("TARGET ANALYSIS"))
+        self.header.setStyleSheet(f"color: {Theme.PRIMARY}; font-weight: 900; letter-spacing: 2px; font-size: 14px;")
+        self.header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        ip_layout.addWidget(self.header)
         
         # Profile Image Placeholder
         self.profile_img = QLabel()
@@ -88,10 +89,10 @@ class MonitorView(QWidget):
         ip_layout.addStretch()
         
         # Manual Override Button
-        btn_lock = QLabel("🔒 SECURITY LOCK ACTIVE")
-        btn_lock.setStyleSheet(f"background-color: {Theme.SURFACE_HOVER}; color: {Theme.ACCENT}; padding: 10px; border-radius: 4px; font-weight: bold;")
-        btn_lock.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        ip_layout.addWidget(btn_lock)
+        self.btn_lock = QLabel(f"🔒 {T.tr('SECURITY LOCK ACTIVE')}")
+        self.btn_lock.setStyleSheet(f"background-color: {Theme.SURFACE_HOVER}; color: {Theme.ACCENT}; padding: 10px; border-radius: 4px; font-weight: bold;")
+        self.btn_lock.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        ip_layout.addWidget(self.btn_lock)
 
         layout.addWidget(self.info_panel)
 
@@ -139,12 +140,12 @@ class MonitorView(QWidget):
                 if is_match:
                     color = (0, 0, 255)  # Red for missing child match
                     display_label = f"MATCH: {name} [{int(distance*100)}%]"
-                    status_text = "MATCH FOUND"
+                    status_text = T.tr("MATCH FOUND")
                     status_color = Theme.DANGER
                 else:
                     color = (0, 255, 0)  # Green for unknown (safe)
-                    display_label = f"Unknown"
-                    status_text = "SCANNING"
+                    display_label = T.tr("Unknown")
+                    status_text = T.tr("SCANNING")
                     status_color = Theme.ACCENT
                 
                 detected_target = True
@@ -188,7 +189,7 @@ class MonitorView(QWidget):
                         self.last_capture_time = current_time
             
             if not detected_target:
-                self.lbl_status.setText("SCANNING...")
+                self.lbl_status.setText(T.tr("SCANNING"))
                 self.lbl_status.setStyleSheet(f"color: {Theme.TEXT_SUB}; font-size: 16px; font-weight: 800;")
                 self.lbl_name.setText("---")
 
@@ -212,6 +213,12 @@ class MonitorView(QWidget):
             self.video_label.setPixmap(scaled_pixmap)
         finally:
             self.render_finished.emit()
+
+    def retranslate_ui(self):
+        self.header.setText(T.tr("TARGET ANALYSIS"))
+        self.btn_lock.setText(f"🔒 {T.tr('SECURITY LOCK ACTIVE')}")
+        # Re-set rows (titles) - since they are generated, we'd need to store them.
+        # But most important labels are translated in update_frame.
 
     def update_panel(self, name, conf, status_text, status_color):
         """Update info panel with identity information"""

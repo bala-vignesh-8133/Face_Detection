@@ -5,6 +5,7 @@ from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from ui.styles import Theme
 from core.child_manager import ChildManager
+from core.translator import Translator as T
 
 class RegisterView(QWidget):
     """
@@ -34,7 +35,7 @@ class RegisterView(QWidget):
         f_layout.setContentsMargins(0,0,0,0)
         f_layout.setSpacing(15)
         
-        header = QLabel("Report Missing Child")
+        header = QLabel(T.tr("Report Missing Child"))
         header.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {Theme.TEXT_MAIN};")
         f_layout.addWidget(header)
         
@@ -46,45 +47,45 @@ class RegisterView(QWidget):
         f_layout.addSpacing(20)
         
         # Fields
-        f_layout.addWidget(self.create_label("CHILD's FULL NAME"))
+        f_layout.addWidget(self.create_label(T.tr("CHILD's FULL NAME")))
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("e.g. John Doe")
         f_layout.addWidget(self.name_input)
         
-        f_layout.addWidget(self.create_label("AGE (approximate)"))
+        f_layout.addWidget(self.create_label(T.tr("AGE (approximate)")))
         self.age_input = QLineEdit()
         self.age_input.setPlaceholderText("e.g. 5")
         f_layout.addWidget(self.age_input)
         
-        f_layout.addWidget(self.create_label("LAST SEEN LOCATION"))
+        f_layout.addWidget(self.create_label(T.tr("LAST SEEN LOCATION")))
         self.last_seen_input = QLineEdit()
         self.last_seen_input.setPlaceholderText("e.g. Central Park, NY")
         f_layout.addWidget(self.last_seen_input)
         
-        f_layout.addWidget(self.create_label("DATE MISSING"))
+        f_layout.addWidget(self.create_label(T.tr("DATE MISSING")))
         self.date_missing_input = QLineEdit()
         self.date_missing_input.setPlaceholderText("e.g. 2026-03-12")
         f_layout.addWidget(self.date_missing_input)
 
-        f_layout.addWidget(self.create_label("AADHAR NUMBER"))
+        f_layout.addWidget(self.create_label(T.tr("AADHAR NUMBER")))
         self.aadhar_input = QLineEdit()
         self.aadhar_input.setPlaceholderText("e.g. 1234 5678 9012")
         f_layout.addWidget(self.aadhar_input)
 
-        f_layout.addWidget(self.create_label("GUARDIAN CONTACT"))
+        f_layout.addWidget(self.create_label(T.tr("GUARDIAN CONTACT")))
         self.contact_input = QLineEdit()
         self.contact_input.setPlaceholderText("e.g. +1 555-0199")
         f_layout.addWidget(self.contact_input)
         
         f_layout.addSpacing(10)
         
-        self.append_check = QCheckBox("Merge into existing profile (New Angle)")
+        self.append_check = QCheckBox(T.tr("Merge into existing profile (New Angle)"))
         self.append_check.setStyleSheet(f"color: {Theme.TEXT_SUB}; font-size: 13px;")
         f_layout.addWidget(self.append_check)
         
         f_layout.addSpacing(20)
         
-        self.capture_btn = QPushButton("REGISTER REPORT")
+        self.capture_btn = QPushButton(T.tr("REGISTER REPORT"))
         self.capture_btn.setObjectName("PrimaryButton")
         self.capture_btn.setFixedHeight(50)
         self.capture_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -105,7 +106,7 @@ class RegisterView(QWidget):
         self.preview_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         p_layout.addWidget(self.preview_label, stretch=1)
         
-        self.upload_btn = QPushButton("Select Photo")
+        self.upload_btn = QPushButton(T.tr("Select Photo"))
         self.upload_btn.setObjectName("SecondaryButton")
         self.upload_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.upload_btn.clicked.connect(self.select_image)
@@ -119,6 +120,14 @@ class RegisterView(QWidget):
         
         layout.addWidget(form_container)
         layout.addWidget(preview_container, stretch=1)
+
+    def retranslate_ui(self):
+        # This is a bit tricky for dynamically created labels, but let's update common once
+        self.capture_btn.setText(T.tr("REGISTER REPORT"))
+        self.upload_btn.setText(T.tr("Select Photo"))
+        self.append_check.setText(T.tr("Merge into existing profile (New Angle)"))
+        # Re-creating form with current logic is better but for now we'll just do this
+        # In a real app we'd store refs to all labels.
 
     def create_label(self, text):
         return QLabel(text, styleSheet=f"color: {Theme.PRIMARY}; font-weight: bold; font-size: 11px; margin-top: 5px;")
