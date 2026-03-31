@@ -87,7 +87,8 @@ class FaceRecognitionEngine:
             
         for filename in os.listdir(self.known_faces_dir):
             if filename.endswith(".dat"):
-                name = filename.split("_")[0]
+                # Correct parsing: Strip .dat and take name before suffix
+                name = filename.replace(".dat", "").split("_")[0]
                 path = os.path.join(self.known_faces_dir, filename)
                 try:
                     # SFace 2021dec output is 128 floats
@@ -141,7 +142,7 @@ class FaceRecognitionEngine:
 
     def register_new_face(self, name: str, image: np.ndarray, append: bool = False) -> bool:
         faces = self.detect_faces(image)
-        if len(faces) == 0:
+        if faces is None or len(faces) == 0:
             return False
         
         # Use first face
